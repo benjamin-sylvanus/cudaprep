@@ -1,0 +1,10 @@
+particle_num
+step_num
+step_size
+perm_prob
+init_in
+D0
+d
+scale
+tstep
+vsize
