@@ -62,6 +62,14 @@ std::vector<std::vector<uint64_t>> simreader::readdims()
     return v;
 }
 
+std::vector<double> simreader::readconstants()
+{
+    std::string path =  this->getpath().append("/constants.bin");
+    return std::vector<double>();
+
+
+}
+
 
 
 

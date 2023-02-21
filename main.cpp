@@ -9,6 +9,7 @@ int main()
     simreader reader(&path);
     cout << reader.getpath() << endl;
     std::vector<double> swcdata = reader.read<double>("/swc.bin");
+    std::vector<double> parameterdata = reader.read<double>("/constants.bin");
     std::vector<uint64_t> indexdata = reader.read<uint64_t>("/index.bin");
     std::vector<uint64_t> lutdata = reader.read<uint64_t>("/lut.bin");
     std::vector<uint64_t> pairsdata = reader.read<uint64_t>("/pairs.bin");
