@@ -31,6 +31,7 @@ public:
     std::vector<std::vector<uint64_t>> readdims();
 
     std::vector<double> readconstants();
+
 };
 
 template <class T>

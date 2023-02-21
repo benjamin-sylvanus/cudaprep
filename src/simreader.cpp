@@ -40,8 +40,7 @@ std::vector<std::vector<uint64_t>> simreader::readdims()
     {   //checking whether the file is open
         std::string tp;
         while(getline(newfile, tp))
-        { //read data from file object and put it into string.
-//            std::cout << tp << "\n"; //print the data of the string
+        {
             std::vector<uint64_t> temp;
             size_t pos = 0;
             std::string token;
@@ -55,7 +54,6 @@ std::vector<std::vector<uint64_t>> simreader::readdims()
             }
             v.push_back(temp);
         }
-
         newfile.close(); //close the file object.
     }
     std::cout<< "Gen path: " <<this->getpath()<<std::endl;

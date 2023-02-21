@@ -12,37 +12,79 @@ class simulation {
     // Props
 private:
     simreader reader;
-    double swc=0; // swc array;
-    int lut; // lut of simulation
-    int index; // index array
-    int pairs; // pairs of swc
-    int bounds; // bounds of geometry
-    int particle_num; // number of particles
-    int step_num; // number of steps to simulate
-    bool init_in=true; // initialize particles inside?
+    std::vector<double> swc; // swc array;
+    std::vector<unsigned long long int> lut; // lut of simulation
+    std::vector<unsigned long long int> index; // index array
+    std::vector<unsigned long long int> pairs; // pairs of swc
+    std::vector<unsigned long long int> bounds; // bounds of geometry
+    double particle_num; // number of particles
+    double step_num; // number of steps to simulate
+    double init_in; // initialize particles inside?
     /**These variable are dependent on eachother */
-    int step_size; // step size of sim (voxel units)
-    int perm_prob; // permeation probability
-    int D0 = 2; // intrinsic diffusivity
-    int d; // 10% min of Radii (um)
-    int tstep; // time step of simulation
+    double step_size; // step size of sim (voxel units)
+    double perm_prob; // permeation probability
+    double D0; // intrinsic diffusivity
+    double d; // 10% min of Radii (um)
+    double tstep; // time step of simulation
+    std::vector<double> parameterdata;
+    std::vector<std::vector<uint64_t>> arraydims;
+    double scale;
+    double vsize;
 
 public:
     // Constructors
-    simulation();
     explicit simulation(simreader reader);
 
     // Mutators
+    void setScale();
+    void setVsize();
+    void setParticle_num();
+    void setStep_num();
+    void setInit_in();
+    void setStep_size();
+    void setPerm_prob();
+    void setD0();
+    void setD();
+    void setTstep();
+    void setSwc();
+    void setLut();
+    void setIndex();
+    void setPairs();
+    void setbounds();
+    void setParameterdata();
+    void setArraydims();
 
     // Accessors
+    double getScale();
+    double getVsize();
+    double getParticle_num();
+    double getStep_num();
+    double getInit_in();
+    double getStep_size();
+    double getPerm_prob();
+    double getD0();
+    double getD();
+    double getTstep();
+    std::vector<double> getSwc();
+    std::vector<unsigned long long int> getLut();
+    std::vector<unsigned long long int> getIndex();
+    std::vector<unsigned long long int> getPairs();
+    std::vector<unsigned long long int> getbounds();
+    std::vector<double> getParameterdata();
+    std::vector<std::vector<uint64_t>> getArraydims();
 
-    // Facilitators
 
-    // Enquiry
+    /**Facilitators:
+     * Do things
+     */
+
+
+    /**Enquiry:
+     * Is Simulation and Is Simulation Valid;
+     */
 
     // Destructor
-    ~simulation() = delete;
-
+    ~simulation() = default;
 
 };
 
