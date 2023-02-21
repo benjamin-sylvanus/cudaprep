@@ -5,6 +5,11 @@
 //
 
 #include "simulation.h"
+#include "iostream"
+#include <random>
+#include <cmath>
+#include <chrono>
+#include <iostream>
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "OCUnusedGlobalDeclarationInspection"
@@ -42,7 +47,7 @@ double simulation::getStep_num() const {return this->step_num;}
 
 double simulation::getInit_in() const {return this->init_in;}
 
-double simulation::getStep_size() const {return this->step_size;}
+double * simulation::getStep_size() {return &this->step_size;}
 
 double simulation::getPerm_prob() const {return this->perm_prob;}
 
@@ -143,6 +148,30 @@ void simulation::setParameterdata() {
 
 void simulation::setArraydims() {
     printf("Unsupported\n");
+}
+
+double * simulation::nextPosition(double *nexts) const {
+//    auto elapsed = clock();
+//    clock_t time_req;
+//    time_req = clock();
+    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+    std::mt19937 generator (seed);
+    std::uniform_real_distribution<double> uniform01(0.0, 1.0);
+
+    // generate N random numbers
+    int N = int(particle_num);
+    for (int i = 0; i < N; i++)
+    {
+        double theta = 2 * M_PI * uniform01(generator);
+        double phi = acos(1 - 2 * uniform01(generator));
+        nexts[3*i + 0] = sin(phi) * cos(theta);
+        nexts[3*i + 1] = sin(phi) * sin(theta);
+        nexts[3*i + 2] = cos(phi);
+    }
+//    time_req = clock()-time_req;
+//    std::cout << std::endl << (float)time_req/CLOCKS_PER_SEC << " seconds" << std::endl;
+
+    return nexts;
 }
 
 
