@@ -32,141 +32,117 @@ simulation::simulation(simreader reader)
 
 }
 
-double simulation::getParticle_num() {
-    return 0;
+double simulation::getParticle_num() const {return this->particle_num;}
+
+double simulation::getVsize() const {return this->vsize;}
+
+double simulation::getScale() const {return this->scale;}
+
+double simulation::getStep_num() const {return this->step_num;}
+
+double simulation::getInit_in() const {return this->init_in;}
+
+double simulation::getStep_size() const {return this->step_size;}
+
+double simulation::getPerm_prob() const {return this->perm_prob;}
+
+double simulation::getD0() const {return this->D0;}
+
+double simulation::getD() const {return this->d;}
+
+double simulation::getTstep() const {return this->tstep;}
+
+std::vector<double> simulation::getSwc(){return this->swc;}
+
+std::vector<unsigned long long int> simulation::getLut() {return this->lut;}
+
+std::vector<unsigned long long int> simulation::getIndex() {return this->index;}
+
+std::vector<unsigned long long int> simulation::getPairs() {return this->pairs;}
+
+std::vector<unsigned long long int> simulation::getbounds() {return this->bounds;}
+
+std::vector<double> simulation::getParameterdata() {return this->parameterdata;}
+
+std::vector<std::vector<uint64_t>> simulation::getArraydims() {return this->arraydims;}
+
+void simulation::setScale(double nscale) {
+    printf("Scale: %f -> %f\n",this->scale,nscale);
+    this->scale = nscale;
 }
 
-double simulation::getVsize() {
-    return 0;
-}
-
-double simulation::getScale() {
-    return 0;
-}
-
-double simulation::getStep_num() {
-    return 0;
-}
-
-double simulation::getInit_in() {
-    return 0;
-}
-
-double simulation::getStep_size() {
-    return 0;
-}
-
-double simulation::getPerm_prob() {
-    return 0;
-}
-
-double simulation::getD0()
-{
-    return 0;
-}
-double simulation::getD()
-{
-    return 0;
-}
-double simulation::getTstep()
-{
-    return 0;
-}
-std::vector<double> simulation::getSwc()
-{
-    return{};
-}
-std::vector<unsigned long long int> simulation::getLut()
-{
-    return {};
-}
-std::vector<unsigned long long int> simulation::getIndex()
-{
-    return {};
-}
-std::vector<unsigned long long int> simulation::getPairs()
-{
-    return {};
-}
-std::vector<unsigned long long int> simulation::getbounds()
-{
-    return {};
-}
-std::vector<double> simulation::getParameterdata()
-{
-    return {};
-}
-std::vector<std::vector<uint64_t>> simulation::getArraydims()
-{
-    return {};
-}
-
-void simulation::setScale() {
+void simulation::setVsize(double vs) {
+    printf("Vsize: %f -> %f\n",this->vsize,vs);
+    this->vsize = vs;
 
 }
 
-void simulation::setVsize() {
-
+void simulation::setParticle_num(double pnum) {
+    printf("Particle Num: %.0f -> %.0f\n",this->particle_num,pnum);
+    this->particle_num = pnum;
 }
 
-void simulation::setParticle_num() {
-
+void simulation::setStep_num(double snum) {
+    printf("Step Num: %.0f -> %.0f\n",this->step_num,snum);
+    this->step_num = snum;
 }
 
-void simulation::setStep_num() {
-
+void simulation::setInit_in(double initin) {
+    printf("Initialize Random Walker Inside: %f -> %f\n",this->init_in,initin);
+    this->init_in = initin;
 }
 
-void simulation::setInit_in() {
-
+void simulation::setStep_size(double stepsize) {
+    printf("Step Size: %f -> %f\n",this->step_size,stepsize);
+    this->step_size = stepsize;
 }
 
-void simulation::setStep_size() {
-
+void simulation::setPerm_prob(double permprob) {
+    printf("Permeation Probability: %f -> %f\n",this->perm_prob,permprob);
+    this->perm_prob = permprob;
 }
 
-void simulation::setPerm_prob() {
-
+void simulation::setD0(double d0) {
+    printf("D0: %f -> %f\n",this->D0,d0);
+    this->D0 = d0;
 }
 
-void simulation::setD0() {
-
+void simulation::setD(double d) {
+    printf("d: %f -> %f\n",this->d,d);
+    this->d = d;
 }
 
-void simulation::setD() {
-
-}
-
-void simulation::setTstep() {
-
+void simulation::setTstep(double timestep) {
+    printf("Time Step (ms): %f -> %f\n",this->tstep,timestep);
+    this->tstep = timestep;
 }
 
 void simulation::setSwc() {
-
+    printf("Unsupported\n");
 }
 
 void simulation::setLut() {
-
+    printf("Unsupported\n");
 }
 
 void simulation::setIndex() {
-
+    printf("Unsupported\n");
 }
 
 void simulation::setPairs() {
-
+    printf("Unsupported\n");
 }
 
 void simulation::setbounds() {
-
+    printf("Unsupported\n");
 }
 
 void simulation::setParameterdata() {
-
+    printf("Unsupported\n");
 }
 
 void simulation::setArraydims() {
-
+    printf("Unsupported\n");
 }
 
 

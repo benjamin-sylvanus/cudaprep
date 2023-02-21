@@ -5,7 +5,6 @@
 #ifndef CUDAPREP_SIMULATION_H
 #define CUDAPREP_SIMULATION_H
 
-
 #include "simreader.h"
 
 class simulation {
@@ -36,16 +35,16 @@ public:
     explicit simulation(simreader reader);
 
     // Mutators
-    void setScale();
-    void setVsize();
-    void setParticle_num();
-    void setStep_num();
-    void setInit_in();
-    void setStep_size();
-    void setPerm_prob();
-    void setD0();
-    void setD();
-    void setTstep();
+    void setScale(double update);
+    void setVsize(double vsize);
+    void setParticle_num(double pnum);
+    void setStep_num(double snum);
+    void setInit_in(double initin);
+    void setStep_size(double stepsize);
+    void setPerm_prob(double permprob);
+    void setD0(double d0);
+    void setD(double d);
+    void setTstep(double tstep);
     void setSwc();
     void setLut();
     void setIndex();
@@ -55,16 +54,16 @@ public:
     void setArraydims();
 
     // Accessors
-    double getScale();
-    double getVsize();
-    double getParticle_num();
-    double getStep_num();
-    double getInit_in();
-    double getStep_size();
-    double getPerm_prob();
-    double getD0();
-    double getD();
-    double getTstep();
+    [[nodiscard]] double getScale() const;
+    [[nodiscard]] double getVsize() const;
+    [[nodiscard]] double getParticle_num() const;
+    [[nodiscard]] double getStep_num() const;
+    [[nodiscard]] double getInit_in() const;
+    [[nodiscard]] double getStep_size() const;
+    [[nodiscard]] double getPerm_prob() const;
+    [[nodiscard]] double getD0() const;
+    [[nodiscard]] double getD() const;
+    [[nodiscard]] double getTstep() const;
     std::vector<double> getSwc();
     std::vector<unsigned long long int> getLut();
     std::vector<unsigned long long int> getIndex();
@@ -85,6 +84,7 @@ public:
 
     // Destructor
     ~simulation() = default;
+
 
 };
 
