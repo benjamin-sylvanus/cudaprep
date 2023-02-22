@@ -22,7 +22,7 @@ int main()
     par.setState(false);
     par.display();
 
-    sim.setParticle_num(1000000);
+    sim.setParticle_num(10000);
     double poses[int(3*sim.getParticle_num())];
     double * nextPositions = sim.nextPosition(poses);
 
