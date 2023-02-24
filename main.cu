@@ -18,7 +18,6 @@
 using std::cout;
 using std::endl;
 
-
 __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long seed) {
     int idx = threadIdx.x + blockDim.x * blockIdx.x;
     curand_init(seed, idx, 0, &state[idx]);
@@ -52,7 +51,8 @@ doaflip(double *A, double *Bounds, int *LUT, bool *conditionalExample, curandSta
         int linearIndex = 0 + b[2] * (b[1] * _A[0] + _A[1]) + _A[2];
         conditionalExample[gid] = (bool) LUT[linearIndex];
 
-        if (debug) {
+        if (debug)
+        {
             printf("Xi: [%f %f %f]\n", xi.x, xi.y, xi.z);
             printf("Xi*b: [%f %f %f]\n", xi.x * Bounds[0], xi.y * Bounds[1], xi.z * Bounds[2]);
             printf("Floor of A: [%d %d %d]\n", _A[0], _A[1], _A[2]);
@@ -83,11 +83,6 @@ void setupSimulation()
     sim.setParticle_num(100);
     double poses[int(3 * sim.getParticle_num())];
     double *nextPositions = sim.nextPosition(poses);
-
-    for (int i = 0; i < 3 * int(sim.getParticle_num()); i += 3) {
-//        printf("particle: %.3f %.3f %.3f\n",poses[i],poses[i+1],poses[i+2]);
-    }
-
     double nextvectors[int(3 * sim.getParticle_num())];
     double *coords;
     auto elapsed = clock();
@@ -138,7 +133,24 @@ void inithostlut(int * hostLookup, int prod, int bx, int by, int bz)
 }
 
 int main() {
+
     setupSimulation();
+    /**
+     * Read Simulation and Initialize Object
+     */
+
+    std::string path = "/autofs/homes/009/bs244/cuda-workspace/hellocuda/cudaprep/data";
+    simreader reader(&path);
+    simulation sim(reader);
+    sim.setStep_num(1000);
+    sim.setParticle_num(10000);
+
+    std::vector<double> simulationparams = sim.getParameterdata();
+
+    for (double d:simulationparams)
+    {
+        printf("%f\n",d);
+    }
 
     int size = 100;
     int block_size = 128;
