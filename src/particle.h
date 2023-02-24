@@ -21,8 +21,6 @@ public:
     particle();
     particle(bool flag, bool state, const double *pInt,double * pStep);
     explicit particle(double *pStep, bool flag = false, bool state=true);
-
-
     double * getPos();
     bool * getFlag();
     bool * getState();
