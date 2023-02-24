@@ -112,7 +112,7 @@ void setupSimulation()
     }
 }
 
-void inithostlut(int * hostLookup, int prod)
+void inithostlut(int * hostLookup, int prod, int bx, int by, int bz)
 {
     memset(hostLookup, 0, prod * sizeof(int));
     int id0 = 0 + bx * (by * 0 + 1) + 1;
@@ -143,6 +143,8 @@ int main() {
     int size = 100;
     int block_size = 128;
     int NO_BYTES = size * sizeof(double);
+    dim3 block(block_size);
+    dim3 grid((size/block.x)+1);
     int random_bytes = size * sizeof(double) * 3;
 
     double boundx = 5.0;
@@ -175,7 +177,7 @@ int main() {
     // Set Values for Host
     memset(hostLogicalVector, false, size * sizeof(bool));
     hostBounds[0] = boundx; hostBounds[1] = boundy; hostBounds[2] = boundz;
-    inithostlut(hostLookup, prod);
+    inithostlut(hostLookup, prod, bx ,by,bz);
 
     /**
      * Device Section:
@@ -208,7 +210,7 @@ int main() {
     setup_kernel<<<grid, block>>>(deviceState, 1);
 
     // option for printing in kernel
-    debug = false;
+    bool debug = false;
 
     /**
      * Call Kernel
