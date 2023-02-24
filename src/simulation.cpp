@@ -19,7 +19,7 @@ simulation::simulation(simreader reader)
 {
     this->swc = reader.read<double>("/swc.bin");
     this->parameterdata = reader.read<double>("/constants.bin");
-    this->index = reader.read<uint64_t>("/index.bin");
+    this->index = reader.read<std::uint64_t>("/index.bin");
     this->lut = reader.read<uint64_t>("/lut.bin");
     this->pairs = reader.read<uint64_t>("/pairs.bin");
     this->bounds = reader.read<uint64_t>("/bounds.bin");
@@ -59,13 +59,13 @@ double simulation::getTstep() const {return this->tstep;}
 
 std::vector<double> simulation::getSwc(){return this->swc;}
 
-std::vector<unsigned long long int> simulation::getLut() {return this->lut;}
+std::vector<std::uint64_t> simulation::getLut() {return this->lut;}
 
-std::vector<unsigned long long int> simulation::getIndex() {return this->index;}
+std::vector<std::uint64_t> simulation::getIndex() {return this->index;}
 
-std::vector<unsigned long long int> simulation::getPairs() {return this->pairs;}
+std::vector<std::uint64_t> simulation::getPairs() {return this->pairs;}
 
-std::vector<unsigned long long int> simulation::getbounds() {return this->bounds;}
+std::vector<std::uint64_t> simulation::getbounds() {return this->bounds;}
 
 std::vector<double> simulation::getParameterdata() {return this->parameterdata;}
 

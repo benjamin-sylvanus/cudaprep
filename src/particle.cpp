@@ -49,9 +49,6 @@ particle::particle(double *pStep, bool flag, bool state)
     this->state=state;
 }
 
-
-
-
 particle::particle() = default;
 
 

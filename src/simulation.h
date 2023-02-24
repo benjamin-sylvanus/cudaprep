@@ -13,10 +13,10 @@ class simulation {
 private:
     simreader reader;
     std::vector<double> swc; // swc array;
-    std::vector<unsigned long long int> lut; // lut of simulation
-    std::vector<unsigned long long int> index; // index array
-    std::vector<unsigned long long int> pairs; // pairs of swc
-    std::vector<unsigned long long int> bounds; // bounds of geometry
+    std::vector<std::uint64_t> lut; // lut of simulation
+    std::vector<std::uint64_t> index; // index array
+    std::vector<std::uint64_t> pairs; // pairs of swc
+    std::vector<std::uint64_t> bounds; // bounds of geometry
     double particle_num; // number of particles
     double step_num; // number of steps to simulate
     double init_in; // initialize particles inside?
@@ -66,10 +66,10 @@ public:
     [[nodiscard]] double getD() const;
     [[nodiscard]] double getTstep() const;
     std::vector<double> getSwc();
-    std::vector<unsigned long long int> getLut();
-    std::vector<unsigned long long int> getIndex();
-    std::vector<unsigned long long int> getPairs();
-    std::vector<unsigned long long int> getbounds();
+    std::vector<std::uint64_t> getLut();
+    std::vector<std::uint64_t> getIndex();
+    std::vector<std::uint64_t> getPairs();
+    std::vector<std::uint64_t> getbounds();
     std::vector<double> getParameterdata();
     std::vector<std::vector<uint64_t>> getArraydims();
 

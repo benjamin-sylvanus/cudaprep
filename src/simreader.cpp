@@ -27,7 +27,7 @@ std::string simreader::getpath()
     return *this->genpath;
 }
 
-std::vector<std::vector<uint64_t>> simreader::readdims()
+std::vector<std::vector<std::uint64_t>> simreader::readdims()
 {
     std::string path =  this->getpath().append("/dims.txt");
     std::cout<<"Path: "<<path<<std::endl;
@@ -35,13 +35,13 @@ std::vector<std::vector<uint64_t>> simreader::readdims()
     std::fstream newfile;
 
     newfile.open(path,std::ios::in); //open a file to perform read operation using file object
-    std::vector<std::vector<uint64_t>> v;
+    std::vector<std::vector<std::uint64_t>> v;
     if (newfile.is_open())
     {   //checking whether the file is open
         std::string tp;
         while(getline(newfile, tp))
         {
-            std::vector<uint64_t> temp;
+            std::vector<std::uint64_t> temp;
             size_t pos = 0;
             std::string token;
             std::string delimiter = "\t";
