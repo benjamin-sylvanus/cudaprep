@@ -38,13 +38,13 @@ template <class T>
 std::vector<T> simreader::read(std::string str) // NOLINT(performance-unnecessary-value-param)
 {
     std::string FullPath = this->getpath().append(str);
-    std::cout<<"File: "<<FullPath<<std::endl;
+    // std::cout<<"File: "<<FullPath<<std::endl;
     datatemplate<T> Data(FullPath);
     for(T t: Data.data)
     {
-        std::cout<< t<< "\t";
+        // std::cout<< t<< "\t";
     }
-    printf("\n");
+    // printf("\n");
     return Data.data;
 }
 #endif //CUDAPREP_SIMREADER_H
