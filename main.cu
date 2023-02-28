@@ -521,5 +521,8 @@ int main() {
     free(hostBounds);
     free(hostLookup);
     free(hostLogicalVector);
+    free(hostIndexArray);
+    free(hostdx2);
+    free(hostSWC);
     return 0;
 }
