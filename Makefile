@@ -13,8 +13,13 @@ all: $(objects)
 %.o: %.cpp
 		nvcc -x cu -arch=sm_75 -I. -dc $< -o $@
 
+some: 
+		nvcc -ccbin g++ -dc -m64 -o main.o -c main.cu
+		nvcc -arch=sm_75 main.o  $(objects) -o app
 clean:
 		rm -f ./src/*.o
 		rm -f *.o app
 		# rm cublas-example
+cleanapp:
+		rm -f app
 
