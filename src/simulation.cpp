@@ -5,8 +5,12 @@
 //
 
 #include "simulation.h"
+#include "iostream"
+#include<random>
+#include<cmath>
+#include<chrono>
+#include <iostream>
 
-#include <random>
 
 
 #pragma clang diagnostic push
@@ -149,9 +153,9 @@ void simulation::setArraydims() {
 }
 
 double * simulation::nextPosition(double *nexts) const {
-//    auto elapsed = clock();
-//    clock_t time_req;
-//    time_req = clock();
+    auto elapsed = clock();
+    clock_t time_req;
+    time_req = clock();
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::mt19937 generator (seed);
     std::uniform_real_distribution<double> uniform01(0.0, 1.0);

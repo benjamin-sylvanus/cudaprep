@@ -3,7 +3,7 @@
 # test:
 -include objects.mk
 
-objects = ./src/particle.o ./src/datatemplate.o ./src/simulation.o ./src/simreader.o
+objects = ./src/particle.o ./src/datatemplate.o ./src/simulation.o ./src/simreader.o ./src/cpu_functions.o
 all: $(objects)
 		nvcc -ccbin g++ -dc -m64 -o main.o -c main.cu
 		nvcc -arch=sm_75 -dlink $(objects) main.o -lcublas -lcurand -o gpuCode.o
