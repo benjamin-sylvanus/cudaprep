@@ -3,11 +3,7 @@
 //
 
 #include "particle.h"
-#include "iostream"
-#include<random>
-#include<cmath>
-#include<chrono>
-#include <iostream>
+
 
 particle::particle(bool flag, bool state, const double *pos, double * stepsize) {
     this->flag = flag;
