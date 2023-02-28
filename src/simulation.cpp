@@ -5,11 +5,9 @@
 //
 
 #include "simulation.h"
-#include "iostream"
+
 #include <random>
-#include <cmath>
-#include <chrono>
-#include <iostream>
+
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "OCUnusedGlobalDeclarationInspection"

@@ -5,7 +5,6 @@
 #include <iostream>
 #include <fstream>
 #include "simreader.h"
-#include "vector"
 #include "datatemplate.h"
 
 
