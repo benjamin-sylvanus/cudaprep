@@ -11,8 +11,6 @@
 #include<chrono>
 #include <iostream>
 
-
-
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "OCUnusedGlobalDeclarationInspection"
 

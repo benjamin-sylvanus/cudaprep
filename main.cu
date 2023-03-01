@@ -1,51 +1,22 @@
-#include <iostream>
+
 #include "./src/simreader.h"
 #include "./src/simulation.h"
 #include "./src/particle.h"
 #include "vector"
-#include "cublas_v2.h"
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
+#include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include "cuda.h"
+#include <cuda.h>
 #include <cstring>
-#include "curand.h"
-#include "cuda_runtime.h"
+#include <curand.h>
 #include <curand_kernel.h>
-#include "device_launch_parameters.h"
-
-/* Includes, system */
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <iostream>
-/* Includes, cuda */
-#include <cublas_v2.h>
-#include <cuda_runtime.h>
-// #include <helper_cuda.h>
+#include "cuda_runtime_api.h"
 
 using std::cout;
 using std::endl;
-
-// ********** cuda kernel **********
-__device__ double atomAdd(double *address, double val) {
-    unsigned long long int *address_as_ull =
-            (unsigned long long int *) address;
-    unsigned long long int old = *address_as_ull, assumed;
-
-    do {
-        assumed = old;
-        old = atomicCAS(address_as_ull, assumed,
-                        __double_as_longlong(val +
-                                             __longlong_as_double(assumed)));
-
-        // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
-    } while (assumed != old);
-
-    return __longlong_as_double(old);
-}
 
 
 __device__ bool swc2v(double3 nextpos, double4 child, double4 parent, double dist) {
@@ -134,6 +105,7 @@ simulate(double *A, double *dx2, double *Bounds, int *LUT, int *IndexArray, doub
 
         double3 nextpos;
         double3 xnot;
+        double3 d2;
 
         int3 upper;
         int3 lower;
@@ -146,9 +118,7 @@ simulate(double *A, double *dx2, double *Bounds, int *LUT, int *IndexArray, doub
         double permprob = 0.0;
         double step = 1;
         double res = 0.5;
-        double dx;
-        double dy;
-        double dz;
+
         double dist2;
 
         // init local state var
@@ -264,6 +234,7 @@ simulate(double *A, double *dx2, double *Bounds, int *LUT, int *IndexArray, doub
                 // printf("Completes [step,particle] (%d, %d): %d\n",i,gid,completes);
 
                 if (parstate.y) {
+                    printf("any\n");
                     A[gx.x] = nextpos.x;
                     A[gx.y] = nextpos.y;
                     A[gx.z] = nextpos.z;
@@ -275,7 +246,7 @@ simulate(double *A, double *dx2, double *Bounds, int *LUT, int *IndexArray, doub
                         A[gx.z] = nextpos.z;
                     }
                     if (!completes && parstate.x && !parstate.y) {
-                        // printf("REJECTION ALERT!\n");
+                        printf("REJECTION ALERT!\n");
                         flag = true;
                     }
                 }
@@ -284,16 +255,18 @@ simulate(double *A, double *dx2, double *Bounds, int *LUT, int *IndexArray, doub
             }
 
 
-            dx = (A[gx.x] - xnot.x) * res;
-            dy = (A[gx.y] - xnot.y) * res;
-            dz = (A[gx.z] - xnot.z) * res;
+            d2.x = (A[gx.x] - xnot.x) * res;
+            d2.y = (A[gx.y] - xnot.y) * res;
+            d2.z = (A[gx.z] - xnot.z) * res;
+            
+            // diffusion tensor 
+            atomicAdd(&dx2[6 * i + 0], d2.x * d2.x);
+            atomicAdd(&dx2[6 * i + 1], d2.x * d2.y);
+            atomicAdd(&dx2[6 * i + 2], d2.x * d2.z);
+            atomicAdd(&dx2[6 * i + 3], d2.y * d2.y);
+            atomicAdd(&dx2[6 * i + 4], d2.y * d2.z);
+            atomicAdd(&dx2[6 * i + 5], d2.z * d2.z);
 
-            atomAdd(&dx2[6 * i + 0], dx * dx);
-            atomAdd(&dx2[6 * i + 1], dx * dy);
-            atomAdd(&dx2[6 * i + 2], dx * dz);
-            atomAdd(&dx2[6 * i + 3], dy * dy);
-            atomAdd(&dx2[6 * i + 4], dy * dz);
-            atomAdd(&dx2[6 * i + 5], dz * dz);
         }
     }
 }
@@ -347,13 +320,15 @@ int main() {
 
     std::vector<double> simulationparams = sim.getParameterdata();
 
-    int size = 100000;
-    int iter = 100000;
+    int size = 1000;
+    int iter = 100;
     int block_size = 128;
     int NO_BYTES = size * sizeof(double);
     dim3 block(block_size);
     dim3 grid((size / block.x) + 1);
     int random_bytes = size * sizeof(double) * 3;
+
+    // todo: figure out why different bound size gives bug
 
     double boundx = 20.0;
     double boundy = 20.0;
@@ -496,8 +471,8 @@ int main() {
     }
 
     for (int i = 0; i < iter; i += 10) {
-        printf("xx: %.4f \t xy: %.4f \t xz: %.4f\t yy: %.4f\t yz: %.4f\t zz: %.4f\t \n", hostdx2[i * 6 + 0],
-               hostdx2[i * 6 + 1], hostdx2[i * 6 + 2], hostdx2[i * 6 + 3], hostdx2[i * 6 + 4], hostdx2[i * 6 + 5]);
+        // printf("xx: %.4f \t xy: %.4f \t xz: %.4f\t yy: %.4f\t yz: %.4f\t zz: %.4f\t \n", hostdx2[i * 6 + 0],
+            //    hostdx2[i * 6 + 1], hostdx2[i * 6 + 2], hostdx2[i * 6 + 3], hostdx2[i * 6 + 4], hostdx2[i * 6 + 5]);
     }
 
     /**

@@ -7,7 +7,6 @@
 #include "simreader.h"
 #include "datatemplate.h"
 
-
 simreader::simreader() = default;
 
 simreader::simreader(std::string *path)
