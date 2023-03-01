@@ -244,18 +244,16 @@ simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double 
                             child.y = (double) d4swc[vindex.x].y;
                             child.z = (double) d4swc[vindex.x].z;
                             child.w = (double) d4swc[vindex.x].w;
-                            printf("CHILD\tx:%2.4f y:%2.4f z:%2.4f r:%2.4f\n", child.x, child.y, child.z, child.w);
+                            printf("CHILD \tx:%2.4f y:%2.4f z:%2.4f r:%2.4f\n", child.x, child.y, child.z, child.w);
 
                             // extract parent values
-                            parent.x = (double) SWC[vindex.y].x;
-                            parent.y = (double) SWC[vindex.y].y;
-                            parent.z = (double) SWC[vindex.y].z;
-                            parent.w = (double) SWC[vindex.y].w;
-                            printf("PARENT\tx:%2.4f y:%2.4f z:%2.4f r:%2.4f\n", parent.x, parent.y, parent.z, parent.w);
+                            parent.x = (double) d4swc[vindex.y].x;
+                            parent.y = (double) d4swc[vindex.y].y;
+                            parent.z = (double) d4swc[vindex.y].z;
+                            parent.w = (double) d4swc[vindex.y].w;
+                            printf("PARENT \tx:%2.4f y:%2.4f z:%2.4f r:%2.4f\n", parent.x, parent.y, parent.z, parent.w);
                             //distance squared between child parent
-                            dist2 = ((parent.x - child.x) * (parent.x - child.x)) +
-                                    ((parent.y - child.y) * (parent.y - child.y)) +
-                                    ((parent.z - child.z) * (parent.z - child.z));
+                            dist2 = ((parent.x - child.x) * (parent.x - child.x)) + ((parent.y - child.y) * (parent.y - child.y)) + ((parent.z - child.z) * (parent.z - child.z));
 
                             // determine whether particle is inside this connection
                             bool inside = swc2v(nextpos, child, parent, dist2);
@@ -272,7 +270,7 @@ simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double 
                         // if the value of the index array is -1 we have checked all pairs for this particle.
                         else {
                             // end for p loop
-                            p = pairmax;
+                            page = pairmax;
                         }
                     }
 
@@ -323,7 +321,7 @@ simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double 
 //                            }
 //                        }
                     }
-                }
+                
                 // determine if step executes
                 completes = xi.w < permprob;
                 // printf("Completes [step,particle] (%d, %d): %d\n",i,gid,completes);
@@ -757,9 +755,9 @@ int main() {
         // printf("x: %.4f \t y: %.4f \t z: %.4f\t Has Lookup Values: %d\n", x, y, z, hostLogicalVector[i]);
     }
 
-    for (int i = 0; i < iter; i += 10) {
-        // printf("xx: %.4f \t xy: %.4f \t xz: %.4f\t yy: %.4f\t yz: %.4f\t zz: %.4f\t \n", hostdx2[i * 6 + 0],
-        //    hostdx2[i * 6 + 1], hostdx2[i * 6 + 2], hostdx2[i * 6 + 3], hostdx2[i * 6 + 4], hostdx2[i * 6 + 5]);
+    for (int i = 0; i < iter; i ++) {
+        printf("xx: %.4f \t xy: %.4f \t xz: %.4f\t yy: %.4f\t yz: %.4f\t zz: %.4f\t \n", hostdx2[i * 6 + 0],
+           hostdx2[i * 6 + 1], hostdx2[i * 6 + 2], hostdx2[i * 6 + 3], hostdx2[i * 6 + 4], hostdx2[i * 6 + 5]);
     }
 
     /**
