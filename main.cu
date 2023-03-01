@@ -246,7 +246,7 @@ simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double 
                         A[gx.z] = nextpos.z;
                     }
                     if (!completes && parstate.x && !parstate.y) {
-                        printf("REJECTION ALERT!\n");
+                        // printf("REJECTION ALERT!\n");
                         flag = true;
                     }
                 }
@@ -273,7 +273,7 @@ simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double 
 
 
 void setupSimulation() {
-    std::string path = "/autofs/homes/009/bs244/cuda-workspace/hellocuda/cudaprep/data";
+    std::string path = "/homes/9/bs244/Desktop/cudacodes/temp/cudaprep/data";
     simreader reader(&path);
     simulation sim(reader);
     sim.setStep_num(1000);
@@ -314,7 +314,7 @@ int main() {
      * Read Simulation and Initialize Object
      */
 
-    std::string path = "/autofs/homes/009/bs244/cuda-workspace/hellocuda/cudaprep/data";
+    std::string path = "/homes/9/bs244/Desktop/cudacodes/temp/cudaprep/data";
     simreader reader(&path);
     simulation sim(reader);
 
