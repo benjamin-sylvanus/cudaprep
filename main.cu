@@ -85,12 +85,29 @@ __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long se
 
 __global__ void
 simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double *SWC, bool *conditionalExample,
-         curandStatePhilox4_32_10_t *state, int size, const int pairmax, int iter,
+         curandStatePhilox4_32_10_t *state, double * SimulationParams, double4 * d4swc, int size, const int pairmax, int iter,
          bool debug) {
 
     int gid = threadIdx.x + blockDim.x * blockIdx.x;
 
     if (gid < size) {
+        double particle_num = SimulationParams[0];
+        double step_num = SimulationParams[1]; 
+        double step_size = SimulationParams[2]; 
+        double perm_prob = SimulationParams[3]; 
+        double init_in = SimulationParams[4]; 
+        double D0 = SimulationParams[5]; 
+        double d = SimulationParams[6]; 
+        double scale = SimulationParams[7]; 
+        double tstep = SimulationParams[8]; 
+        double vsize = SimulationParams[9]; 
+        if (gid<3)
+        {
+            printf("double4 swc[0]->\nx: %f \t y: %f \t z: %f \t r: %f\n",d4swc[0].x,d4swc[0].y,d4swc[0].z,d4swc[0].w);
+            printf("double4 swc[1]->\nx: %f \t y: %f \t z: %f \t r: %f\n",d4swc[1].x,d4swc[1].y,d4swc[1].z,d4swc[1].w);
+            printf("particle_num: %f step_num: %f step_size: %f perm_prob: %f init_in: %f D0: %f d: %f scale: %f tstep: %f vsize: %f\n",particle_num, step_num, step_size, perm_prob, init_in, D0, d, scale, tstep, vsize);
+        }
+
         int3 gx;
         gx.x = 3 * gid + 0;
         gx.y = 3 * gid + 1;
@@ -317,28 +334,79 @@ int main() {
     std::string path = "/homes/9/bs244/Desktop/cudacodes/temp/cudaprep/data";
     simreader reader(&path);
     simulation sim(reader);
-
+    double simparam[10];
     std::vector<double> simulationparams = sim.getParameterdata();
 
-    int size = 1000;
-    int iter = 100;
+    for (int i = 0; i<10; i++)
+    {
+        double value = simulationparams[i];
+        simparam[i] = value;
+        printf("%f\t",simulationparams[i]);
+    }
+    printf("\n");
+
+
+    /* 
+    todo figure out why lower values of size and iteration causes bug.
+    -- This appears to be the cutoff
+    int size = 65;
+    int iter = 65;
+    */
+    int size = 65;
+    int iter = 65;
     int block_size = 128;
-    int NO_BYTES = size * sizeof(double);
     dim3 block(block_size);
     dim3 grid((size / block.x) + 1);
-    int random_bytes = size * sizeof(double) * 3;
+
+    // we could convert our devices random vector to a double3
+    int random_bytes =  3 * size * sizeof(double);
 
     // todo: figure out why different bound size gives bug
-
-    int boundx = 20;
-    int boundy = 20;
-    int boundz = 20;
+    std::vector<uint64_t> bounds = sim.getbounds();
+    int boundx = (int) bounds[0];
+    int boundy = (int) bounds[1];
+    int boundz = (int) bounds[2];
 
     int bx = (int) (boundx);
     int by = (int) (boundy);
     int bz = (int) (boundz);
     int prod = (int) (boundx * boundy * boundz);
 
+    std::vector<double> r_swc = sim.getSwc();
+    int nrow = r_swc.size()/6;
+    printf("NRows: %d\n", r_swc.size()/6);
+
+    /**
+     * @brief Indexing SWC ARRAY
+     * index + (dx*0:5);
+     * row+(nrow*col)
+     * Example: nrow = 10; get all elements from row 1;
+     * swc[1,0:5] ----> 
+     * swc(1,0) = swc[1+10*0];
+     * swc(1,1) = swc[1+10*1];
+     * swc(1,2) = swc[1+10*2];
+     * swc(1,3) = swc[1+10*3];
+     * swc(1,4) = swc[1+10*4];
+     * swc(1,5) = swc[1+10*5];
+     */
+
+    int doffset=2;
+    printf("[0,:]= %f \t %f \t %f \t %f \t %f \t %f\n", r_swc[0 + doffset*0],r_swc[0 + doffset*1],r_swc[0 + doffset*2],r_swc[0 + doffset*3],r_swc[0 + doffset*4],r_swc[0 + doffset*5]);
+    printf("[1,:]= %f \t %f \t %f \t %f \t %f \t %f\n", r_swc[1 + doffset*0],r_swc[1 + doffset*1],r_swc[1 + doffset*2],r_swc[1 + doffset*3],r_swc[1 + doffset*4],r_swc[1 + doffset*5]);
+    // 1	6	6	6	2	1
+    // 2	16	6	6	2	1
+
+    //we only need the x y z r of our swc array.
+    double4 swc_trim[nrow];
+    for (int i = 0; i < nrow; i++)
+    {
+        swc_trim[i].x = r_swc[i+nrow*1];
+        swc_trim[i].y = r_swc[i+nrow*2];
+        swc_trim[i].z = r_swc[i+nrow*3];
+        swc_trim[i].w = r_swc[i+nrow*4];
+    }
+    printf("Trimmed SWC[0,:] = %f \t %f \t %f \t %f \n", swc_trim[0].x, swc_trim[0].y, swc_trim[0].z, swc_trim[0].w);
+    printf("Trimmed SWC[0,:] = %f \t %f \t %f \t %f \n", swc_trim[1].x, swc_trim[1].y, swc_trim[1].z, swc_trim[1].w);
     const int pairmax = 4;
     int npair = 10;
 
@@ -357,6 +425,9 @@ int main() {
     double *hostSWC;
     int indexsize = pairmax * npair;
     double *hostdx2;
+    double *hostSimP;
+
+    double4 *hostD4Swc;
 
     // Alloc Memory for Host Pointers
     h_a = (double *) malloc(random_bytes);
@@ -366,12 +437,29 @@ int main() {
     hostIndexArray = (int *) malloc(pairmax * 2 * npair * sizeof(int));
     hostSWC = (double *) malloc(4 * indexsize * sizeof(double));
     hostdx2 = (double *) malloc(6 * iter * sizeof(double));
-
+    hostSimP = (double *) malloc(10*sizeof(double));
+    hostD4Swc = (double4 *) malloc(nrow*sizeof(double4));
 
     // Set Values for Host
     memset(hostIndexArray, 0, pairmax * 2 * npair * sizeof(int));
     memset(hostSWC, 0, indexsize * sizeof(double));
     memset(hostdx2, 0, 6 * iter * sizeof(double));
+
+    for(int i = 0; i < nrow; i++)
+    {
+        hostD4Swc[i].x = swc_trim[i].x;
+        hostD4Swc[i].y = swc_trim[i].y;
+        hostD4Swc[i].z = swc_trim[i].z;
+        hostD4Swc[i].w = swc_trim[i].w;
+    }
+
+
+    for(int i = 0; i < 10; i++)
+    {
+        hostSimP[i] = simparam[i];
+    }
+
+
 
     for (int i = 0; i < npair; i++) {
         printf("HINDEX@I: ");
@@ -416,6 +504,9 @@ int main() {
     int *deviceIndexArray;
     double *deviceSWC;
     double *devicedx2;
+    double *deviceSimP;
+    double4 *deviced4Swc;
+
     clock_t start = clock();
     // Allocate Memory on Device
     cudaMalloc((int **) &deviceLookup, prod * sizeof(int));
@@ -426,14 +517,23 @@ int main() {
     cudaMalloc((bool **) &deviceLogicalVector, size * sizeof(bool));
     cudaMalloc((curandStatePhilox4_32_10_t * *) & deviceState, size * sizeof(curandStatePhilox4_32_10_t));
     cudaMalloc((double **) &devicedx2, 6 * iter * sizeof(double));
+    cudaMalloc((double **) &deviceSimP,10*sizeof(double));
+    cudaMalloc((double4 **) &deviced4Swc,nrow*sizeof(double4));
+
+
 
     // Set Values for Device
     cudaMemcpy(deviceBounds, hostBounds, 3 * sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceLookup, hostLookup, prod * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceLogicalVector, hostLogicalVector, size * sizeof(bool), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceIndexArray, hostIndexArray, pairmax * 2 * npair * sizeof(int), cudaMemcpyHostToDevice);
+    //todo make deviceSWC use double4 and values from disk.
     cudaMemcpy(deviceSWC, hostSWC, 4 * indexsize * sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(devicedx2, hostdx2, 6 * iter * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(deviceSimP, hostSimP, 10 * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(deviced4Swc, hostD4Swc,nrow * sizeof(double4), cudaMemcpyHostToDevice);
+
+
 
     /**
      * Initalize Random Stream
@@ -448,7 +548,7 @@ int main() {
     */
 
     simulate<<<grid, block>>>(d_a, devicedx2, deviceBounds, deviceLookup, deviceIndexArray, deviceSWC,
-                              deviceLogicalVector, deviceState, size, pairmax, iter, debug);
+                              deviceLogicalVector, deviceState, deviceSimP,deviced4Swc, size, pairmax, iter, debug);
     // Wait for results
     cudaDeviceSynchronize();
 
@@ -486,6 +586,8 @@ int main() {
     cudaFree(deviceIndexArray);
     cudaFree(devicedx2);
     cudaFree(deviceSWC);
+    cudaFree(deviceSimP);
+    cudaFree(deviced4Swc);
 
 
 
@@ -499,5 +601,7 @@ int main() {
     free(hostIndexArray);
     free(hostdx2);
     free(hostSWC);
+    free(hostSimP);
+    free(hostD4Swc);
     return 0;
 }
