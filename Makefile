@@ -18,7 +18,6 @@ some:
 clean:
 		rm -f ./src/*.o
 		rm -f *.o app
-		# rm cublas-example
 cleanapp:
 		rm -f app
 
