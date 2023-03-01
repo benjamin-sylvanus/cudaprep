@@ -84,7 +84,7 @@ __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long se
 }
 
 __global__ void
-simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double *SWC, bool *conditionalExample,
+simulate(double *A, double *dx2, int3 Bounds, int *LUT, int *IndexArray, double *SWC, bool *conditionalExample,
          curandStatePhilox4_32_10_t *state, double * SimulationParams, double4 * d4swc, int size, const int pairmax, int iter,
          bool debug) {
 
@@ -145,9 +145,9 @@ simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double 
         xi = curand_uniform4_double(&localstate);
 
         // todo: random initial state
-        A[gx.x] = xi.x * Bounds[0];
-        A[gx.y] = xi.y * Bounds[1];
-        A[gx.z] = xi.z * Bounds[2];
+        A[gx.x] = xi.x * Bounds.x;
+        A[gx.y] = xi.y * Bounds.y;
+        A[gx.z] = xi.z * Bounds.z;
 
         // record initial position
         xnot.x = A[gx.x];
@@ -177,9 +177,9 @@ simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double 
                 // find voxels within range of lookup table
 
                 // upper bounds of lookup table
-                upper.x = floorpos.x < Bounds[0];
-                upper.y = floorpos.y < Bounds[1];
-                upper.z = floorpos.z < Bounds[2];
+                upper.x = floorpos.x < Bounds.x;
+                upper.y = floorpos.y < Bounds.y;
+                upper.z = floorpos.z < Bounds.z;
 
                 // lower bounds of lookup table
                 lower.x = floorpos.x >= 0;
@@ -196,7 +196,7 @@ simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double 
 
                     // scuffed sub2ind function
                     // todo: check this implementation
-                    int id = 0 + Bounds[0] * (Bounds[1] * floorpos.x + floorpos.y) + floorpos.z;
+                    int id = 0 + Bounds.x * (Bounds.y * floorpos.x + floorpos.y) + floorpos.z;
 
                     // warn this is unchecked
                     int value = LUT[id];
@@ -418,7 +418,7 @@ int main() {
      */
     // Create Host Pointers
     double *h_a;
-    int *hostBounds;
+    int3 hostBounds;
     int *hostLookup;
     bool *hostLogicalVector;
     int *hostIndexArray;
@@ -431,7 +431,7 @@ int main() {
 
     // Alloc Memory for Host Pointers
     h_a = (double *) malloc(random_bytes);
-    hostBounds = (int *) malloc(3 * sizeof(int));
+//    hostBounds = (int3) malloc(sizeof(int3));
     hostLogicalVector = (bool *) malloc(size * sizeof(bool));
     hostLookup = (int *) malloc(prod * sizeof(int));
     hostIndexArray = (int *) malloc(pairmax * 2 * npair * sizeof(int));
@@ -484,9 +484,9 @@ int main() {
     }
 
     memset(hostLogicalVector, false, size * sizeof(bool));
-    hostBounds[0] = boundx;
-    hostBounds[1] = boundy;
-    hostBounds[2] = boundz;
+    hostBounds.x = boundx;
+    hostBounds.y = boundy;
+    hostBounds.z = boundz;
     inithostlut(hostLookup, prod, bx, by, bz);
 
     /**
@@ -498,7 +498,7 @@ int main() {
     // Create Device Pointers
     curandStatePhilox4_32_10_t *deviceState;
     double *d_a;
-    int *deviceBounds;
+    int3 deviceBounds;
     int *deviceLookup;
     bool *deviceLogicalVector;
     int *deviceIndexArray;
@@ -513,7 +513,7 @@ int main() {
     cudaMalloc((int **) &deviceIndexArray, pairmax * 2 * npair * sizeof(int));
     cudaMalloc((double **) &deviceSWC, 4 * indexsize * sizeof(double));
     cudaMalloc((double **) &d_a, random_bytes);
-    cudaMalloc((int **) &deviceBounds, 3 * sizeof(int));
+//    cudaMalloc((int3 **) &deviceBounds,sizeof(int3));
     cudaMalloc((bool **) &deviceLogicalVector, size * sizeof(bool));
     cudaMalloc((curandStatePhilox4_32_10_t * *) & deviceState, size * sizeof(curandStatePhilox4_32_10_t));
     cudaMalloc((double **) &devicedx2, 6 * iter * sizeof(double));
@@ -523,7 +523,7 @@ int main() {
 
 
     // Set Values for Device
-    cudaMemcpy(deviceBounds, hostBounds, 3 * sizeof(double), cudaMemcpyHostToDevice);
+
     cudaMemcpy(deviceLookup, hostLookup, prod * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceLogicalVector, hostLogicalVector, size * sizeof(bool), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceIndexArray, hostIndexArray, pairmax * 2 * npair * sizeof(int), cudaMemcpyHostToDevice);
@@ -547,7 +547,7 @@ int main() {
      * Call Kernel
     */
 
-    simulate<<<grid, block>>>(d_a, devicedx2, deviceBounds, deviceLookup, deviceIndexArray, deviceSWC,
+    simulate<<<grid, block>>>(d_a, devicedx2, hostBounds, deviceLookup, deviceIndexArray, deviceSWC,
                               deviceLogicalVector, deviceState, deviceSimP,deviced4Swc, size, pairmax, iter, debug);
     // Wait for results
     cudaDeviceSynchronize();
