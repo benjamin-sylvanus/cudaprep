@@ -18,8 +18,7 @@
 using std::cout;
 using std::endl;
 
-__device__ int s2i(int3 i,int3 b)
-{ 
+__device__ int s2i(int3 i, int3 b) {
     return 0 + b.x * (b.y * i.z + i.y) + i.x;
 }
 
@@ -90,28 +89,31 @@ __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long se
 
 __global__ void
 simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double *SWC, bool *conditionalExample,
-         curandStatePhilox4_32_10_t *state, double * SimulationParams, double4 * d4swc,int *nlut, int * NewIndex,int * IndexSize, int size, const int pairmax, int iter,
+         curandStatePhilox4_32_10_t *state, double *SimulationParams, double4 *d4swc, int *nlut, int *NewIndex,
+         int *IndexSize, int size, const int pairmax, int iter,
          bool debug) {
-    
+
 
     int gid = threadIdx.x + blockDim.x * blockIdx.x;
 
     if (gid < size) {
         double particle_num = SimulationParams[0];
-        double step_num = SimulationParams[1]; 
-        double step_size = SimulationParams[2]; 
-        double perm_prob = SimulationParams[3]; 
-        double init_in = SimulationParams[4]; 
-        double D0 = SimulationParams[5]; 
-        double d = SimulationParams[6]; 
-        double scale = SimulationParams[7]; 
-        double tstep = SimulationParams[8]; 
-        double vsize = SimulationParams[9]; 
-        if (gid<3)
-        {
-            printf("double4 swc[0]->\nx: %f \t y: %f \t z: %f \t r: %f\n",d4swc[0].x,d4swc[0].y,d4swc[0].z,d4swc[0].w);
-            printf("double4 swc[1]->\nx: %f \t y: %f \t z: %f \t r: %f\n",d4swc[1].x,d4swc[1].y,d4swc[1].z,d4swc[1].w);
-            printf("particle_num: %f step_num: %f step_size: %f perm_prob: %f init_in: %f D0: %f d: %f scale: %f tstep: %f vsize: %f\n",particle_num, step_num, step_size, perm_prob, init_in, D0, d, scale, tstep, vsize);
+        double step_num = SimulationParams[1];
+        double step_size = SimulationParams[2];
+        double perm_prob = SimulationParams[3];
+        double init_in = SimulationParams[4];
+        double D0 = SimulationParams[5];
+        double d = SimulationParams[6];
+        double scale = SimulationParams[7];
+        double tstep = SimulationParams[8];
+        double vsize = SimulationParams[9];
+        if (gid < 3) {
+            printf("double4 swc[0]->\nx: %f \t y: %f \t z: %f \t r: %f\n", d4swc[0].x, d4swc[0].y, d4swc[0].z,
+                   d4swc[0].w);
+            printf("double4 swc[1]->\nx: %f \t y: %f \t z: %f \t r: %f\n", d4swc[1].x, d4swc[1].y, d4swc[1].z,
+                   d4swc[1].w);
+            printf("particle_num: %f step_num: %f step_size: %f perm_prob: %f init_in: %f D0: %f d: %f scale: %f tstep: %f vsize: %f\n",
+                   particle_num, step_num, step_size, perm_prob, init_in, D0, d, scale, tstep, vsize);
         }
 
         int3 gx;
@@ -212,97 +214,114 @@ simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double 
                     // todo: check this implementation
                     int id = 0 + Bounds[0] * (Bounds[1] * floorpos.x + floorpos.y) + floorpos.z;
                     // printf("id: %d\n",id);
-                    int id_test = s2i(floorpos,b_int3);
-                    printf("X: %d\tY: %d\tZ: %d -> %d\t LUT[%d]: %d\n",floorpos.x,floorpos.y,floorpos.z,id_test,id_test,nlut[id_test]);
+                    int id_test = s2i(floorpos, b_int3);
+                    printf("X: %d\tY: %d\tZ: %d -> %d\t LUT[%d]: %d\n", floorpos.x, floorpos.y, floorpos.z, id_test,
+                           id_test, nlut[id_test]);
 
                     int test_lutvalue = nlut[id_test];
 
-                    // id_test gives x coord of index array. we need all values at x.
-
                     /**
-                     * @brief Indexing Index Array                    
-                     * 
-                     *
-                     *
-                     * 
-                     *
-                     *
-                     *
-                     * 
+                     * @brief Indexing Index Array
+                     * <li> N x 2 x M </li>
+                     * <li> Index Array subscripted indices can be passed to s2i. </li>
+                     * <li> Our lookuptable returns x value of index array </li>
+                     * <li> Each X is a 2xM array; </li>
+                     * <li> We take child parent pairs from 0:M using for loop; </li>
+                     * <li> index formula: </li>
+                     * \b stride + dx * (dy * z + y) + x;
                      */
-                    // for(int row:)
-                    for(int page = 0; page < i_int3.z; page++) 
-                    {
-                        int3 c_new = make_int3(test_lutvalue,0,page);
-                        int3 p_new = make_int3(test_lutvalue,1,page);
-                        vindex.x = NewIndex[s2i(c_new,i_int3)]-1;
-                        vindex.y = NewIndex[s2i(p_new,i_int3)]-1;
-                        printf("x: %4.1d y: %4.1d z: %4.1d\t index: %4.1d\n",c_new.x,c_new.y,c_new.z,vindex.x);
-                        printf("x: %4.1d y: %4.1d z: %4.1d\t index: %4.1d\n",p_new.x,p_new.y,p_new.z,vindex.y);
+                    for (int page = 0; page < i_int3.z; page++) {
+                        int3 c_new = make_int3(test_lutvalue, 0, page);
+                        int3 p_new = make_int3(test_lutvalue, 1, page);
+                        vindex.x = NewIndex[s2i(c_new, i_int3)] - 1;
+                        vindex.y = NewIndex[s2i(p_new, i_int3)] - 1;
+                        printf("x: %4.1d y: %4.1d z: %4.1d\t index: %4.1d\n", c_new.x, c_new.y, c_new.z, vindex.x);
+                        printf("x: %4.1d y: %4.1d z: %4.1d\t index: %4.1d\n", p_new.x, p_new.y, p_new.z, vindex.y);
 
 
-                        if ((vindex.x) != -1)
-                        {
-                        child.x = (double) d4swc[vindex.x].x;
-                        child.y = (double) d4swc[vindex.x].y;
-                        child.z = (double) d4swc[vindex.x].z; 
-                        child.w = (double) d4swc[vindex.x].w; 
-                        printf("CHILD\tx:%2.4f y:%2.4f z:%2.4f r:%2.4f\n",child.x,child.y,child.z,child.w);
+                        if ((vindex.x) != -1) {
+                            child.x = (double) d4swc[vindex.x].x;
+                            child.y = (double) d4swc[vindex.x].y;
+                            child.z = (double) d4swc[vindex.x].z;
+                            child.w = (double) d4swc[vindex.x].w;
+                            printf("CHILD\tx:%2.4f y:%2.4f z:%2.4f r:%2.4f\n", child.x, child.y, child.z, child.w);
+
+                            // extract parent values
+                            parent.x = (double) SWC[vindex.y].x;
+                            parent.y = (double) SWC[vindex.y].y;
+                            parent.z = (double) SWC[vindex.y].z;
+                            parent.w = (double) SWC[vindex.y].w;
+                            printf("PARENT\tx:%2.4f y:%2.4f z:%2.4f r:%2.4f\n", parent.x, parent.y, parent.z, parent.w);
+                            //distance squared between child parent
+                            dist2 = ((parent.x - child.x) * (parent.x - child.x)) +
+                                    ((parent.y - child.y) * (parent.y - child.y)) +
+                                    ((parent.z - child.z) * (parent.z - child.z));
+
+                            // determine whether particle is inside this connection
+                            bool inside = swc2v(nextpos, child, parent, dist2);
+
+                            // if it is inside the connection we don't need to check the remaining.
+                            if (inside) {
+                                // update the particles state
+                                parstate.y = 1;
+                                // end for p loop
+                                page = pairmax;
+                            }
                         }
 
+                        // if the value of the index array is -1 we have checked all pairs for this particle.
+                        else {
+                            // end for p loop
+                            p = pairmax;
+                        }
                     }
 
-
-                    
-                    
-                    
-                    // warn this is unchecked
-                    int value = LUT[id];
-                    if (value >= 0) {
-                        // const int pmax_2 = pairmax+pairmax;
-                        // extract value of indexarray @ index
-
-                        for (int p = 0; p < pairmax; p++) {
-                            // extract the childId and parentId
-                            vindex.x = IndexArray[pairmax * value + 2 * p + 0];
-                            vindex.y = IndexArray[pairmax * value + 2 * p + 1];
-                            // check validity of connection given some index array values will be empty
-                            if ((vindex.x) != -1) {
-                                // extract child values
-                                child.x = (double) SWC[vindex.x * 4 + 0];
-                                child.y = (double) SWC[vindex.x * 4 + 1];
-                                child.z = (double) SWC[vindex.x * 4 + 2];
-                                child.w = (double) SWC[vindex.x * 4 + 3];
-
-                                // extract parent values
-                                parent.x = (double) SWC[vindex.y * 4 + 0];
-                                parent.y = (double) SWC[vindex.y * 4 + 1];
-                                parent.z = (double) SWC[vindex.y * 4 + 2];
-                                parent.w = (double) SWC[vindex.y * 4 + 3];
-
-                                //distance squared between child parent
-                                dist2 = ((parent.x - child.x) * (parent.x - child.x)) +
-                                               ((parent.y - child.y) * (parent.y - child.y)) +
-                                               ((parent.z - child.z) * (parent.z - child.z));
-
-                                // determine whether particle is inside this connection
-                                bool inside = swc2v(nextpos, child, parent, dist2);
-
-                                // if it is inside the connection we don't need to check the remaining.
-                                if (inside) {
-                                    // update the particles state
-                                    parstate.y = 1;
-                                    // end for p loop
-                                    p = pairmax;
-                                }
-                            }
-                                // if the value of the index array is -1 we have checked all pairs for this particle.
-                            else 
-                            {
-                                // end for p loop
-                                p = pairmax;
-                            }
-                        }
+//                    // warn this is unchecked
+//                    int value = LUT[id];
+//                    if (value >= 0) {
+//                        // const int pmax_2 = pairmax+pairmax;
+//                        // extract value of indexarray @ index
+//
+//                        for (int p = 0; p < pairmax; p++) {
+//                            // extract the childId and parentId
+//                            vindex.x = IndexArray[pairmax * value + 2 * p + 0];
+//                            vindex.y = IndexArray[pairmax * value + 2 * p + 1];
+//                            // check validity of connection given some index array values will be empty
+//                            if ((vindex.x) != -1) {
+//                                // extract child values
+//                                child.x = (double) SWC[vindex.x * 4 + 0];
+//                                child.y = (double) SWC[vindex.x * 4 + 1];
+//                                child.z = (double) SWC[vindex.x * 4 + 2];
+//                                child.w = (double) SWC[vindex.x * 4 + 3];
+//
+//                                // extract parent values
+//                                parent.x = (double) SWC[vindex.y * 4 + 0];
+//                                parent.y = (double) SWC[vindex.y * 4 + 1];
+//                                parent.z = (double) SWC[vindex.y * 4 + 2];
+//                                parent.w = (double) SWC[vindex.y * 4 + 3];
+//
+//                                //distance squared between child parent
+//                                dist2 = ((parent.x - child.x) * (parent.x - child.x)) +
+//                                        ((parent.y - child.y) * (parent.y - child.y)) +
+//                                        ((parent.z - child.z) * (parent.z - child.z));
+//
+//                                // determine whether particle is inside this connection
+//                                bool inside = swc2v(nextpos, child, parent, dist2);
+//
+//                                // if it is inside the connection we don't need to check the remaining.
+//                                if (inside) {
+//                                    // update the particles state
+//                                    parstate.y = 1;
+//                                    // end for p loop
+//                                    p = pairmax;
+//                                }
+//                            }
+//                                // if the value of the index array is -1 we have checked all pairs for this particle.
+//                            else {
+//                                // end for p loop
+//                                p = pairmax;
+//                            }
+//                        }
                     }
                 }
                 // determine if step executes
@@ -333,7 +352,7 @@ simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double 
             d2.x = (A[gx.x] - xnot.x) * res;
             d2.y = (A[gx.y] - xnot.y) * res;
             d2.z = (A[gx.z] - xnot.z) * res;
-            
+
             // diffusion tensor 
             atomicAdd(&dx2[6 * i + 0], d2.x * d2.x);
             atomicAdd(&dx2[6 * i + 1], d2.x * d2.y);
@@ -395,11 +414,10 @@ int main() {
     double simparam[10];
     std::vector<double> simulationparams = sim.getParameterdata();
 
-    for (int i = 0; i<10; i++)
-    {
+    for (int i = 0; i < 10; i++) {
         double value = simulationparams[i];
         simparam[i] = value;
-        printf("%f\t",simulationparams[i]);
+        printf("%f\t", simulationparams[i]);
     }
     printf("\n");
 
@@ -417,10 +435,10 @@ int main() {
     dim3 grid((size / block.x) + 1);
 
     // we could convert our devices random vector to a double3
-    int random_bytes =  3 * size * sizeof(double);
+    int random_bytes = 3 * size * sizeof(double);
 
     // todo: figure out why different bound size gives bug
-    std::vector<uint64_t> bounds = sim.getbounds();
+    std::vector <uint64_t> bounds = sim.getbounds();
     int boundx = (int) bounds[0];
     int boundy = (int) bounds[1];
     int boundz = (int) bounds[2];
@@ -434,8 +452,8 @@ int main() {
     int prod = (int) (boundx * boundy * boundz);
 
     std::vector<double> r_swc = sim.getSwc();
-    int nrow = r_swc.size()/6;
-    printf("NRows: %d\n", r_swc.size()/6);
+    int nrow = r_swc.size() / 6;
+    printf("NRows: %d\n", r_swc.size() / 6);
 
     /**
      * @brief Indexing SWC ARRAY
@@ -443,48 +461,49 @@ int main() {
      * row+(nrow*col)
      * Example: nrow = 10; get all elements from row 1;
      * swc[1,0:5] ----> 
-     * swc(1,0) = swc[1+10*0];
-     * swc(1,1) = swc[1+10*1];
-     * swc(1,2) = swc[1+10*2];
-     * swc(1,3) = swc[1+10*3];
-     * swc(1,4) = swc[1+10*4];
-     * swc(1,5) = swc[1+10*5];
+     * <li> swc(1,0) = swc[1+10*0];</li>
+     * <li> swc(1,1) = swc[1+10*1];</li>
+     * <li> swc(1,2) = swc[1+10*2];</li>
+     * <li> swc(1,3) = swc[1+10*3];</li>
+     * <li> swc(1,4) = swc[1+10*4];</li>
+     * <li> swc(1,5) = swc[1+10*5];</li>
      */
 
-    int doffset=2;
-    printf("[0,:]= %f \t %f \t %f \t %f \t %f \t %f\n", r_swc[0 + doffset*0],r_swc[0 + doffset*1],r_swc[0 + doffset*2],r_swc[0 + doffset*3],r_swc[0 + doffset*4],r_swc[0 + doffset*5]);
-    printf("[1,:]= %f \t %f \t %f \t %f \t %f \t %f\n", r_swc[1 + doffset*0],r_swc[1 + doffset*1],r_swc[1 + doffset*2],r_swc[1 + doffset*3],r_swc[1 + doffset*4],r_swc[1 + doffset*5]);
+    int doffset = 2;
+    printf("[0,:]= %f \t %f \t %f \t %f \t %f \t %f\n", r_swc[0 + doffset * 0], r_swc[0 + doffset * 1],
+           r_swc[0 + doffset * 2], r_swc[0 + doffset * 3], r_swc[0 + doffset * 4], r_swc[0 + doffset * 5]);
+    printf("[1,:]= %f \t %f \t %f \t %f \t %f \t %f\n", r_swc[1 + doffset * 0], r_swc[1 + doffset * 1],
+           r_swc[1 + doffset * 2], r_swc[1 + doffset * 3], r_swc[1 + doffset * 4], r_swc[1 + doffset * 5]);
     // 1	6	6	6	2	1
     // 2	16	6	6	2	1
 
     //we only need the x y z r of our swc array.
     double4 swc_trim[nrow];
-    for (int i = 0; i < nrow; i++)
-    {
-        swc_trim[i].x = r_swc[i+nrow*1];
-        swc_trim[i].y = r_swc[i+nrow*2];
-        swc_trim[i].z = r_swc[i+nrow*3];
-        swc_trim[i].w = r_swc[i+nrow*4];
+    for (int i = 0; i < nrow; i++) {
+        swc_trim[i].x = r_swc[i + nrow * 1];
+        swc_trim[i].y = r_swc[i + nrow * 2];
+        swc_trim[i].z = r_swc[i + nrow * 3];
+        swc_trim[i].w = r_swc[i + nrow * 4];
     }
     printf("Trimmed SWC[0,:] = %f \t %f \t %f \t %f \n", swc_trim[0].x, swc_trim[0].y, swc_trim[0].z, swc_trim[0].w);
     printf("Trimmed SWC[0,:] = %f \t %f \t %f \t %f \n", swc_trim[1].x, swc_trim[1].y, swc_trim[1].z, swc_trim[1].w);
     const int pairmax = 4;
     int npair = 10;
 
-    std::vector<uint64_t> lut = sim.getLut();
+    std::vector <uint64_t> lut = sim.getLut();
 
     // stride + bx * (by * y + z) + x
     int id0 = 0 + (boundx) * ((boundy) * 2 + 2) + 3;
-    printf("lut[%d]: %d\n",id0,lut[id0]);
+    printf("lut[%d]: %d\n", id0, lut[id0]);
 
 
     // stride + bx * (by * z + y) + x
     // 8,5,3 -> 698 ||| 7,4,2 -> 698
     int id1 = 0 + (boundx) * ((boundy) * 2 + 4) + 7;
-    printf("lut[%d]: %d\n",id1,lut[id1]);
-    
+    printf("lut[%d]: %d\n", id1, lut[id1]);
 
-    std::vector<uint64_t> indexarr = sim.getIndex();
+
+    std::vector <uint64_t> indexarr = sim.getIndex();
 
     // for (int i=0;i<indexarr.size();i++)
     // {
@@ -499,25 +518,31 @@ int main() {
     // (x: 0,y:0,z:1);
     // stride + dx * (dy*z + y) + x;
     id1 = 0 + 735 * (2 * 1 + 0) + 0;
-    printf("indexarr[%d]: %d\n",id1,indexarr[id1]);
+    printf("indexarr[%d]: %d\n", id1, indexarr[id1]);
     // (x: [1],y:[0:1],z:[0]);
     // stride + dx * (dy*z + y) + x;
-    int lx; int ly; int lz;
+    int lx;
+    int ly;
+    int lz;
 
-    lx=1; ly=0; lz=0;
-    id1 = 0 + 735 * (2 * lz+ly)+lx;
-    printf("indexarr[%d]: %d\n",id1,indexarr[id1]);
-    ly=1;
-    id1 = 0 + 735 * (2 * lz+ly)+lx;
-    printf("indexarr[%d]: %d\n",id1,indexarr[id1]);
+    lx = 1;
+    ly = 0;
+    lz = 0;
+    id1 = 0 + 735 * (2 * lz + ly) + lx;
+    printf("indexarr[%d]: %d\n", id1, indexarr[id1]);
+    ly = 1;
+    id1 = 0 + 735 * (2 * lz + ly) + lx;
+    printf("indexarr[%d]: %d\n", id1, indexarr[id1]);
 
-    lx=343; ly = 0; lz = 0;
-    id1 = 0 + 735 * (2 * lz+ly)+lx;
-    printf("indexarr[%d]: %d\n",id1,indexarr[id1]);
+    lx = 343;
+    ly = 0;
+    lz = 0;
+    id1 = 0 + 735 * (2 * lz + ly) + lx;
+    printf("indexarr[%d]: %d\n", id1, indexarr[id1]);
 
 
-    
-    
+
+
 
 
     /**
@@ -526,15 +551,15 @@ int main() {
      * voxel coord: (x,y,z);
     */
 
-    std::vector<std::vector<uint64_t>> arrdims = sim.getArraydims();
+    std::vector <std::vector<uint64_t>> arrdims = sim.getArraydims();
 
-    std::vector<uint64_t> swc_dims = arrdims[0]; 
-    std::vector<uint64_t> lut_dims = arrdims[1];
-    std::vector<uint64_t> index_dims = arrdims[2];
-    std::vector<uint64_t> pairs_dims = arrdims[3];
-    std::vector<uint64_t> bounds_dims = arrdims[4];
+    std::vector <uint64_t> swc_dims = arrdims[0];
+    std::vector <uint64_t> lut_dims = arrdims[1];
+    std::vector <uint64_t> index_dims = arrdims[2];
+    std::vector <uint64_t> pairs_dims = arrdims[3];
+    std::vector <uint64_t> bounds_dims = arrdims[4];
 
-    printf("%d \t %d \t %d\n",index_dims[0],index_dims[1],index_dims[2]);
+    printf("%d \t %d \t %d\n", index_dims[0], index_dims[1], index_dims[2]);
     int newindexsize = index_dims[0] * index_dims[1] * index_dims[2];
 
     /**
@@ -554,9 +579,9 @@ int main() {
     int indexsize = pairmax * npair;
     double *hostdx2;
     double *hostSimP;
-    int * hostNewLut;
-    int * hostNewIndex;
-    int * hostIndexSize;
+    int *hostNewLut;
+    int *hostNewIndex;
+    int *hostIndexSize;
 
     double4 *hostD4Swc;
 
@@ -568,11 +593,11 @@ int main() {
     hostIndexArray = (int *) malloc(pairmax * 2 * npair * sizeof(int));
     hostSWC = (double *) malloc(4 * indexsize * sizeof(double));
     hostdx2 = (double *) malloc(6 * iter * sizeof(double));
-    hostSimP = (double *) malloc(10*sizeof(double));
-    hostD4Swc = (double4 *) malloc(nrow*sizeof(double4));
-    hostNewLut = (int *) malloc(prod*sizeof(int));
-    hostNewIndex = (int *) malloc(newindexsize*sizeof(int));
-    hostIndexSize = (int *) malloc(3*sizeof(int));
+    hostSimP = (double *) malloc(10 * sizeof(double));
+    hostD4Swc = (double4 *) malloc(nrow * sizeof(double4));
+    hostNewLut = (int *) malloc(prod * sizeof(int));
+    hostNewIndex = (int *) malloc(newindexsize * sizeof(int));
+    hostIndexSize = (int *) malloc(3 * sizeof(int));
 
 
     // Set Values for Host
@@ -581,29 +606,23 @@ int main() {
     memset(hostdx2, 0, 6 * iter * sizeof(double));
 
 
-
-
-    for(int i=0; i<3; i++)
-    {
+    for (int i = 0; i < 3; i++) {
         int value = index_dims[i];
         hostIndexSize[i] = value;
     }
 
 
-    for(int i = 0; i<indexarr.size(); i++)
-    {
+    for (int i = 0; i < indexarr.size(); i++) {
         int value = indexarr[i];
         hostNewIndex[i] = value;
     }
 
-    for(int i = 0; i<prod; i++)
-    {
+    for (int i = 0; i < prod; i++) {
         int value = lut[i];
-        hostNewLut[i]=value;
+        hostNewLut[i] = value;
     }
 
-    for(int i = 0; i < nrow; i++)
-    {
+    for (int i = 0; i < nrow; i++) {
         hostD4Swc[i].x = swc_trim[i].x;
         hostD4Swc[i].y = swc_trim[i].y;
         hostD4Swc[i].z = swc_trim[i].z;
@@ -611,11 +630,9 @@ int main() {
     }
 
 
-    for(int i = 0; i < 10; i++)
-    {
+    for (int i = 0; i < 10; i++) {
         hostSimP[i] = simparam[i];
     }
-
 
 
     for (int i = 0; i < npair; i++) {
@@ -663,9 +680,9 @@ int main() {
     double *devicedx2;
     double *deviceSimP;
     double4 *deviced4Swc;
-    int * deviceNewLut;
-    int * deviceNewIndex;
-    int * deviceIndexSize;
+    int *deviceNewLut;
+    int *deviceNewIndex;
+    int *deviceIndexSize;
 
     clock_t start = clock();
     // Allocate Memory on Device
@@ -677,11 +694,11 @@ int main() {
     cudaMalloc((bool **) &deviceLogicalVector, size * sizeof(bool));
     cudaMalloc((curandStatePhilox4_32_10_t * *) & deviceState, size * sizeof(curandStatePhilox4_32_10_t));
     cudaMalloc((double **) &devicedx2, 6 * iter * sizeof(double));
-    cudaMalloc((double **) &deviceSimP,10*sizeof(double));
-    cudaMalloc((double4 **) &deviced4Swc,nrow*sizeof(double4));
-    cudaMalloc((int **) &deviceNewLut,prod*sizeof(int));
-    cudaMalloc((int **) &deviceNewIndex,newindexsize*sizeof(int));
-    cudaMalloc((int **) &deviceIndexSize,3*sizeof(int));
+    cudaMalloc((double **) &deviceSimP, 10 * sizeof(double));
+    cudaMalloc((double4 * *) & deviced4Swc, nrow * sizeof(double4));
+    cudaMalloc((int **) &deviceNewLut, prod * sizeof(int));
+    cudaMalloc((int **) &deviceNewIndex, newindexsize * sizeof(int));
+    cudaMalloc((int **) &deviceIndexSize, 3 * sizeof(int));
 
 
 
@@ -696,13 +713,13 @@ int main() {
     cudaMemcpy(deviceSWC, hostSWC, 4 * indexsize * sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(devicedx2, hostdx2, 6 * iter * sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceSimP, hostSimP, 10 * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(deviced4Swc, hostD4Swc,nrow * sizeof(double4), cudaMemcpyHostToDevice);
-    cudaMemcpy(deviceNewLut, hostNewLut,prod * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(deviceNewIndex, hostNewIndex,newindexsize * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(deviced4Swc, hostD4Swc, nrow * sizeof(double4), cudaMemcpyHostToDevice);
+    cudaMemcpy(deviceNewLut, hostNewLut, prod * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(deviceNewIndex, hostNewIndex, newindexsize * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceIndexSize, hostIndexSize, 3 * sizeof(int), cudaMemcpyHostToDevice);
 
-    
-    
+
+
 
     /**
      * Initalize Random Stream
@@ -717,7 +734,8 @@ int main() {
     */
 
     simulate<<<grid, block>>>(d_a, devicedx2, deviceBounds, deviceLookup, deviceIndexArray, deviceSWC,
-                              deviceLogicalVector, deviceState, deviceSimP,deviced4Swc,deviceNewLut,deviceNewIndex,deviceIndexSize, size, pairmax, iter, debug);
+                              deviceLogicalVector, deviceState, deviceSimP, deviced4Swc, deviceNewLut, deviceNewIndex,
+                              deviceIndexSize, size, pairmax, iter, debug);
     // Wait for results
     cudaDeviceSynchronize();
 
@@ -741,7 +759,7 @@ int main() {
 
     for (int i = 0; i < iter; i += 10) {
         // printf("xx: %.4f \t xy: %.4f \t xz: %.4f\t yy: %.4f\t yz: %.4f\t zz: %.4f\t \n", hostdx2[i * 6 + 0],
-            //    hostdx2[i * 6 + 1], hostdx2[i * 6 + 2], hostdx2[i * 6 + 3], hostdx2[i * 6 + 4], hostdx2[i * 6 + 5]);
+        //    hostdx2[i * 6 + 1], hostdx2[i * 6 + 2], hostdx2[i * 6 + 3], hostdx2[i * 6 + 4], hostdx2[i * 6 + 5]);
     }
 
     /**
