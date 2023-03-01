@@ -1,4 +1,3 @@
-
 #include "./src/simreader.h"
 #include "./src/simulation.h"
 #include "./src/particle.h"
@@ -273,7 +272,7 @@ simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double 
                             page = pairmax;
                         }
                     }
-
+                    /*
 //                    // warn this is unchecked
 //                    int value = LUT[id];
 //                    if (value >= 0) {
@@ -320,7 +319,8 @@ simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double 
 //                                p = pairmax;
 //                            }
 //                        }
-                    }
+                     */
+                }
                 
                 // determine if step executes
                 completes = xi.w < permprob;
@@ -363,7 +363,6 @@ simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double 
     }
 }
 
-
 void setupSimulation() {
     std::string path = "/homes/9/bs244/Desktop/cudacodes/temp/cudaprep/data";
     simreader reader(&path);
@@ -405,7 +404,6 @@ int main() {
     /**
      * Read Simulation and Initialize Object
      */
-
     std::string path = "/homes/9/bs244/Desktop/cudacodes/temp/cudaprep/data";
     simreader reader(&path);
     simulation sim(reader);
@@ -419,8 +417,7 @@ int main() {
     }
     printf("\n");
 
-
-    /* 
+    /**
     todo figure out why lower values of size and iteration causes bug.
     -- This appears to be the cutoff
     int size = 65;
@@ -440,9 +437,6 @@ int main() {
     int boundx = (int) bounds[0];
     int boundy = (int) bounds[1];
     int boundz = (int) bounds[2];
-    // int boundx = (int) 10;
-    // int boundy = (int) 10;
-    // int boundz = (int) 10;
 
     int bx = (int) (boundx);
     int by = (int) (boundy);
@@ -466,14 +460,12 @@ int main() {
      * <li> swc(1,4) = swc[1+10*4];</li>
      * <li> swc(1,5) = swc[1+10*5];</li>
      */
-
     int doffset = 2;
     printf("[0,:]= %f \t %f \t %f \t %f \t %f \t %f\n", r_swc[0 + doffset * 0], r_swc[0 + doffset * 1],
            r_swc[0 + doffset * 2], r_swc[0 + doffset * 3], r_swc[0 + doffset * 4], r_swc[0 + doffset * 5]);
     printf("[1,:]= %f \t %f \t %f \t %f \t %f \t %f\n", r_swc[1 + doffset * 0], r_swc[1 + doffset * 1],
            r_swc[1 + doffset * 2], r_swc[1 + doffset * 3], r_swc[1 + doffset * 4], r_swc[1 + doffset * 5]);
-    // 1	6	6	6	2	1
-    // 2	16	6	6	2	1
+    // 0: [1 6 6 6 2 1] 1: [2 16 6 6 2 1]
 
     //we only need the x y z r of our swc array.
     double4 swc_trim[nrow];
@@ -493,70 +485,19 @@ int main() {
     // stride + bx * (by * y + z) + x
     int id0 = 0 + (boundx) * ((boundy) * 2 + 2) + 3;
     printf("lut[%d]: %d\n", id0, lut[id0]);
-
-
-    // stride + bx * (by * z + y) + x
-    // 8,5,3 -> 698 ||| 7,4,2 -> 698
-    int id1 = 0 + (boundx) * ((boundy) * 2 + 4) + 7;
-    printf("lut[%d]: %d\n", id1, lut[id1]);
-
-
     std::vector <uint64_t> indexarr = sim.getIndex();
-
-    // for (int i=0;i<indexarr.size();i++)
-    // {
-    //     printf("indexarr[%d],%d\n",i,indexarr[i]);
-    // }
-
-    // dx 735 
-    // dy 2 
-    // dz 2 
-
-
-    // (x: 0,y:0,z:1);
-    // stride + dx * (dy*z + y) + x;
-    id1 = 0 + 735 * (2 * 1 + 0) + 0;
-    printf("indexarr[%d]: %d\n", id1, indexarr[id1]);
-    // (x: [1],y:[0:1],z:[0]);
-    // stride + dx * (dy*z + y) + x;
-    int lx;
-    int ly;
-    int lz;
-
-    lx = 1;
-    ly = 0;
-    lz = 0;
-    id1 = 0 + 735 * (2 * lz + ly) + lx;
-    printf("indexarr[%d]: %d\n", id1, indexarr[id1]);
-    ly = 1;
-    id1 = 0 + 735 * (2 * lz + ly) + lx;
-    printf("indexarr[%d]: %d\n", id1, indexarr[id1]);
-
-    lx = 343;
-    ly = 0;
-    lz = 0;
-    id1 = 0 + 735 * (2 * lz + ly) + lx;
-    printf("indexarr[%d]: %d\n", id1, indexarr[id1]);
-
-
-
-
-
 
     /**
      * @brief Lookup Table Summary
      * linearindex = stride + bx * (by * z + y) + x 
      * voxel coord: (x,y,z);
     */
-
     std::vector <std::vector<uint64_t>> arrdims = sim.getArraydims();
-
     std::vector <uint64_t> swc_dims = arrdims[0];
     std::vector <uint64_t> lut_dims = arrdims[1];
     std::vector <uint64_t> index_dims = arrdims[2];
     std::vector <uint64_t> pairs_dims = arrdims[3];
     std::vector <uint64_t> bounds_dims = arrdims[4];
-
     printf("%d \t %d \t %d\n", index_dims[0], index_dims[1], index_dims[2]);
     int newindexsize = index_dims[0] * index_dims[1] * index_dims[2];
 
@@ -566,7 +507,6 @@ int main() {
      * - Allocate Memory
      * - Set Values
      */
-
     // Create Host Pointers
     double *h_a;
     int *hostBounds;
@@ -580,7 +520,6 @@ int main() {
     int *hostNewLut;
     int *hostNewIndex;
     int *hostIndexSize;
-
     double4 *hostD4Swc;
 
     // Alloc Memory for Host Pointers
@@ -597,18 +536,15 @@ int main() {
     hostNewIndex = (int *) malloc(newindexsize * sizeof(int));
     hostIndexSize = (int *) malloc(3 * sizeof(int));
 
-
     // Set Values for Host
     memset(hostIndexArray, 0, pairmax * 2 * npair * sizeof(int));
     memset(hostSWC, 0, indexsize * sizeof(double));
     memset(hostdx2, 0, 6 * iter * sizeof(double));
 
-
     for (int i = 0; i < 3; i++) {
         int value = index_dims[i];
         hostIndexSize[i] = value;
     }
-
 
     for (int i = 0; i < indexarr.size(); i++) {
         int value = indexarr[i];
@@ -642,7 +578,9 @@ int main() {
         }
         printf("\n");
     }
+
     double counter = 0.8;
+
     for (int i = 0; i < indexsize; i++) {
         hostSWC[4 * i + 0] = i + counter;
         hostSWC[4 * i + 1] = -i + counter;
@@ -698,16 +636,11 @@ int main() {
     cudaMalloc((int **) &deviceNewIndex, newindexsize * sizeof(int));
     cudaMalloc((int **) &deviceIndexSize, 3 * sizeof(int));
 
-
-
-
-
     // Set Values for Device
     cudaMemcpy(deviceBounds, hostBounds, 3 * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceLookup, hostLookup, prod * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceLogicalVector, hostLogicalVector, size * sizeof(bool), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceIndexArray, hostIndexArray, pairmax * 2 * npair * sizeof(int), cudaMemcpyHostToDevice);
-    //todo make deviceSWC use double4 and values from disk.
     cudaMemcpy(deviceSWC, hostSWC, 4 * indexsize * sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(devicedx2, hostdx2, 6 * iter * sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceSimP, hostSimP, 10 * sizeof(double), cudaMemcpyHostToDevice);
@@ -715,9 +648,6 @@ int main() {
     cudaMemcpy(deviceNewLut, hostNewLut, prod * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceNewIndex, hostNewIndex, newindexsize * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceIndexSize, hostIndexSize, 3 * sizeof(int), cudaMemcpyHostToDevice);
-
-
-
 
     /**
      * Initalize Random Stream
@@ -730,14 +660,11 @@ int main() {
     /**
      * Call Kernel
     */
-
     simulate<<<grid, block>>>(d_a, devicedx2, deviceBounds, deviceLookup, deviceIndexArray, deviceSWC,
                               deviceLogicalVector, deviceState, deviceSimP, deviced4Swc, deviceNewLut, deviceNewIndex,
                               deviceIndexSize, size, pairmax, iter, debug);
     // Wait for results
     cudaDeviceSynchronize();
-
-
 
     /**
      * Copy Results From Device to Host
@@ -748,16 +675,10 @@ int main() {
     clock_t end = clock();
     double gpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
     printf("kernel took %f seconds\n", gpu_time_used);
-    for (int i = 0; i < size; i++) {
-        double x = h_a[3 * i + 0];
-        double y = h_a[3 * i + 1];
-        double z = h_a[3 * i + 2];
-        // printf("x: %.4f \t y: %.4f \t z: %.4f\t Has Lookup Values: %d\n", x, y, z, hostLogicalVector[i]);
-    }
-
-    for (int i = 0; i < iter; i ++) {
-        printf("xx: %.4f \t xy: %.4f \t xz: %.4f\t yy: %.4f\t yz: %.4f\t zz: %.4f\t \n", hostdx2[i * 6 + 0],
-           hostdx2[i * 6 + 1], hostdx2[i * 6 + 2], hostdx2[i * 6 + 3], hostdx2[i * 6 + 4], hostdx2[i * 6 + 5]);
+    for (int i = 0; i < iter; i++)
+    {
+//        printf("xx: %.4f \t xy: %.4f \t xz: %.4f\t yy: %.4f\t yz: %.4f\t zz: %.4f\t \n", hostdx2[i * 6 + 0],
+//           hostdx2[i * 6 + 1], hostdx2[i * 6 + 2], hostdx2[i * 6 + 3], hostdx2[i * 6 + 4], hostdx2[i * 6 + 5]);
     }
 
     /**
@@ -773,8 +694,6 @@ int main() {
     cudaFree(deviceSWC);
     cudaFree(deviceSimP);
     cudaFree(deviced4Swc);
-
-
 
     /**
      * Free Host Data
