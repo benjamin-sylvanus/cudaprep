@@ -18,6 +18,11 @@
 using std::cout;
 using std::endl;
 
+__device__ int s2i(int3 i,int3 b)
+{ 
+    return 0 + b.x * (b.y * i.z + i.y) + i.x;
+}
+
 
 __device__ bool swc2v(double3 nextpos, double4 child, double4 parent, double dist) {
     double x0 = nextpos.x;
@@ -85,8 +90,9 @@ __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long se
 
 __global__ void
 simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double *SWC, bool *conditionalExample,
-         curandStatePhilox4_32_10_t *state, double * SimulationParams, double4 * d4swc, int size, const int pairmax, int iter,
+         curandStatePhilox4_32_10_t *state, double * SimulationParams, double4 * d4swc,int *nlut, int * NewIndex,int * IndexSize, int size, const int pairmax, int iter,
          bool debug) {
+    
 
     int gid = threadIdx.x + blockDim.x * blockIdx.x;
 
@@ -127,13 +133,22 @@ simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double 
         int3 upper;
         int3 lower;
         int3 floorpos;
+        int3 b_int3;
+        b_int3.x = Bounds[0];
+        b_int3.y = Bounds[1];
+        b_int3.z = Bounds[2];
+
+        int3 i_int3;
+        i_int3.x = IndexSize[0];
+        i_int3.y = IndexSize[1];
+        i_int3.z = IndexSize[2];
 
         int2 parstate;
         bool completes;
         bool flag;
 
         double permprob = 0.0;
-        double step = 1;
+        double step = 1.0;
         double res = 0.5;
 
         double dist2;
@@ -145,9 +160,9 @@ simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double 
         xi = curand_uniform4_double(&localstate);
 
         // todo: random initial state
-        A[gx.x] = xi.x * Bounds[0];
-        A[gx.y] = xi.y * Bounds[1];
-        A[gx.z] = xi.z * Bounds[2];
+        A[gx.x] = xi.x * (double) Bounds[0];
+        A[gx.y] = xi.y * (double) Bounds[1];
+        A[gx.z] = xi.z * (double) Bounds[2];
 
         // record initial position
         xnot.x = A[gx.x];
@@ -188,7 +203,6 @@ simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double 
 
                 // position inside the bounds of volume -> state of next position true : false
                 parstate.y = (lower.x && lower.y && lower.z && upper.x && upper.y && upper.z) ? 1 : 0;
-
                 // extract value of lookup @ index
                 if (parstate.y) {
                     // reset particle state for next conditionals
@@ -197,7 +211,51 @@ simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double 
                     // scuffed sub2ind function
                     // todo: check this implementation
                     int id = 0 + Bounds[0] * (Bounds[1] * floorpos.x + floorpos.y) + floorpos.z;
+                    // printf("id: %d\n",id);
+                    int id_test = s2i(floorpos,b_int3);
+                    printf("X: %d\tY: %d\tZ: %d -> %d\t LUT[%d]: %d\n",floorpos.x,floorpos.y,floorpos.z,id_test,id_test,nlut[id_test]);
 
+                    int test_lutvalue = nlut[id_test];
+
+                    // id_test gives x coord of index array. we need all values at x.
+
+                    /**
+                     * @brief Indexing Index Array                    
+                     * 
+                     *
+                     *
+                     * 
+                     *
+                     *
+                     *
+                     * 
+                     */
+                    // for(int row:)
+                    for(int page = 0; page < i_int3.z; page++) 
+                    {
+                        int3 c_new = make_int3(test_lutvalue,0,page);
+                        int3 p_new = make_int3(test_lutvalue,1,page);
+                        vindex.x = NewIndex[s2i(c_new,i_int3)]-1;
+                        vindex.y = NewIndex[s2i(p_new,i_int3)]-1;
+                        printf("x: %4.1d y: %4.1d z: %4.1d\t index: %4.1d\n",c_new.x,c_new.y,c_new.z,vindex.x);
+                        printf("x: %4.1d y: %4.1d z: %4.1d\t index: %4.1d\n",p_new.x,p_new.y,p_new.z,vindex.y);
+
+
+                        if ((vindex.x) != -1)
+                        {
+                        child.x = (double) d4swc[vindex.x].x;
+                        child.y = (double) d4swc[vindex.x].y;
+                        child.z = (double) d4swc[vindex.x].z; 
+                        child.w = (double) d4swc[vindex.x].w; 
+                        printf("CHILD\tx:%2.4f y:%2.4f z:%2.4f r:%2.4f\n",child.x,child.y,child.z,child.w);
+                        }
+
+                    }
+
+
+                    
+                    
+                    
                     // warn this is unchecked
                     int value = LUT[id];
                     if (value >= 0) {
@@ -239,7 +297,8 @@ simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double 
                                 }
                             }
                                 // if the value of the index array is -1 we have checked all pairs for this particle.
-                            else {
+                            else 
+                            {
                                 // end for p loop
                                 p = pairmax;
                             }
@@ -251,7 +310,6 @@ simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double 
                 // printf("Completes [step,particle] (%d, %d): %d\n",i,gid,completes);
 
                 if (parstate.y) {
-                    printf("any\n");
                     A[gx.x] = nextpos.x;
                     A[gx.y] = nextpos.y;
                     A[gx.z] = nextpos.z;
@@ -352,8 +410,8 @@ int main() {
     int size = 65;
     int iter = 65;
     */
-    int size = 65;
-    int iter = 65;
+    int size = 100;
+    int iter = 100;
     int block_size = 128;
     dim3 block(block_size);
     dim3 grid((size / block.x) + 1);
@@ -366,6 +424,9 @@ int main() {
     int boundx = (int) bounds[0];
     int boundy = (int) bounds[1];
     int boundz = (int) bounds[2];
+    // int boundx = (int) 10;
+    // int boundy = (int) 10;
+    // int boundz = (int) 10;
 
     int bx = (int) (boundx);
     int by = (int) (boundy);
@@ -410,12 +471,79 @@ int main() {
     const int pairmax = 4;
     int npair = 10;
 
+    std::vector<uint64_t> lut = sim.getLut();
+
+    // stride + bx * (by * y + z) + x
+    int id0 = 0 + (boundx) * ((boundy) * 2 + 2) + 3;
+    printf("lut[%d]: %d\n",id0,lut[id0]);
+
+
+    // stride + bx * (by * z + y) + x
+    // 8,5,3 -> 698 ||| 7,4,2 -> 698
+    int id1 = 0 + (boundx) * ((boundy) * 2 + 4) + 7;
+    printf("lut[%d]: %d\n",id1,lut[id1]);
+    
+
+    std::vector<uint64_t> indexarr = sim.getIndex();
+
+    // for (int i=0;i<indexarr.size();i++)
+    // {
+    //     printf("indexarr[%d],%d\n",i,indexarr[i]);
+    // }
+
+    // dx 735 
+    // dy 2 
+    // dz 2 
+
+
+    // (x: 0,y:0,z:1);
+    // stride + dx * (dy*z + y) + x;
+    id1 = 0 + 735 * (2 * 1 + 0) + 0;
+    printf("indexarr[%d]: %d\n",id1,indexarr[id1]);
+    // (x: [1],y:[0:1],z:[0]);
+    // stride + dx * (dy*z + y) + x;
+    int lx; int ly; int lz;
+
+    lx=1; ly=0; lz=0;
+    id1 = 0 + 735 * (2 * lz+ly)+lx;
+    printf("indexarr[%d]: %d\n",id1,indexarr[id1]);
+    ly=1;
+    id1 = 0 + 735 * (2 * lz+ly)+lx;
+    printf("indexarr[%d]: %d\n",id1,indexarr[id1]);
+
+    lx=343; ly = 0; lz = 0;
+    id1 = 0 + 735 * (2 * lz+ly)+lx;
+    printf("indexarr[%d]: %d\n",id1,indexarr[id1]);
+
+
+    
+    
+
+
+    /**
+     * @brief Lookup Table Summary
+     * linearindex = stride + bx * (by * z + y) + x 
+     * voxel coord: (x,y,z);
+    */
+
+    std::vector<std::vector<uint64_t>> arrdims = sim.getArraydims();
+
+    std::vector<uint64_t> swc_dims = arrdims[0]; 
+    std::vector<uint64_t> lut_dims = arrdims[1];
+    std::vector<uint64_t> index_dims = arrdims[2];
+    std::vector<uint64_t> pairs_dims = arrdims[3];
+    std::vector<uint64_t> bounds_dims = arrdims[4];
+
+    printf("%d \t %d \t %d\n",index_dims[0],index_dims[1],index_dims[2]);
+    int newindexsize = index_dims[0] * index_dims[1] * index_dims[2];
+
     /**
      * Host Section:
      * - Create Pointers
      * - Allocate Memory
      * - Set Values
      */
+
     // Create Host Pointers
     double *h_a;
     int *hostBounds;
@@ -426,6 +554,9 @@ int main() {
     int indexsize = pairmax * npair;
     double *hostdx2;
     double *hostSimP;
+    int * hostNewLut;
+    int * hostNewIndex;
+    int * hostIndexSize;
 
     double4 *hostD4Swc;
 
@@ -439,11 +570,37 @@ int main() {
     hostdx2 = (double *) malloc(6 * iter * sizeof(double));
     hostSimP = (double *) malloc(10*sizeof(double));
     hostD4Swc = (double4 *) malloc(nrow*sizeof(double4));
+    hostNewLut = (int *) malloc(prod*sizeof(int));
+    hostNewIndex = (int *) malloc(newindexsize*sizeof(int));
+    hostIndexSize = (int *) malloc(3*sizeof(int));
+
 
     // Set Values for Host
     memset(hostIndexArray, 0, pairmax * 2 * npair * sizeof(int));
     memset(hostSWC, 0, indexsize * sizeof(double));
     memset(hostdx2, 0, 6 * iter * sizeof(double));
+
+
+
+
+    for(int i=0; i<3; i++)
+    {
+        int value = index_dims[i];
+        hostIndexSize[i] = value;
+    }
+
+
+    for(int i = 0; i<indexarr.size(); i++)
+    {
+        int value = indexarr[i];
+        hostNewIndex[i] = value;
+    }
+
+    for(int i = 0; i<prod; i++)
+    {
+        int value = lut[i];
+        hostNewLut[i]=value;
+    }
 
     for(int i = 0; i < nrow; i++)
     {
@@ -506,6 +663,9 @@ int main() {
     double *devicedx2;
     double *deviceSimP;
     double4 *deviced4Swc;
+    int * deviceNewLut;
+    int * deviceNewIndex;
+    int * deviceIndexSize;
 
     clock_t start = clock();
     // Allocate Memory on Device
@@ -519,11 +679,16 @@ int main() {
     cudaMalloc((double **) &devicedx2, 6 * iter * sizeof(double));
     cudaMalloc((double **) &deviceSimP,10*sizeof(double));
     cudaMalloc((double4 **) &deviced4Swc,nrow*sizeof(double4));
+    cudaMalloc((int **) &deviceNewLut,prod*sizeof(int));
+    cudaMalloc((int **) &deviceNewIndex,newindexsize*sizeof(int));
+    cudaMalloc((int **) &deviceIndexSize,3*sizeof(int));
+
+
 
 
 
     // Set Values for Device
-    cudaMemcpy(deviceBounds, hostBounds, 3 * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(deviceBounds, hostBounds, 3 * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceLookup, hostLookup, prod * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceLogicalVector, hostLogicalVector, size * sizeof(bool), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceIndexArray, hostIndexArray, pairmax * 2 * npair * sizeof(int), cudaMemcpyHostToDevice);
@@ -532,8 +697,12 @@ int main() {
     cudaMemcpy(devicedx2, hostdx2, 6 * iter * sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceSimP, hostSimP, 10 * sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(deviced4Swc, hostD4Swc,nrow * sizeof(double4), cudaMemcpyHostToDevice);
+    cudaMemcpy(deviceNewLut, hostNewLut,prod * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(deviceNewIndex, hostNewIndex,newindexsize * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(deviceIndexSize, hostIndexSize, 3 * sizeof(int), cudaMemcpyHostToDevice);
 
-
+    
+    
 
     /**
      * Initalize Random Stream
@@ -548,7 +717,7 @@ int main() {
     */
 
     simulate<<<grid, block>>>(d_a, devicedx2, deviceBounds, deviceLookup, deviceIndexArray, deviceSWC,
-                              deviceLogicalVector, deviceState, deviceSimP,deviced4Swc, size, pairmax, iter, debug);
+                              deviceLogicalVector, deviceState, deviceSimP,deviced4Swc,deviceNewLut,deviceNewIndex,deviceIndexSize, size, pairmax, iter, debug);
     // Wait for results
     cudaDeviceSynchronize();
 
