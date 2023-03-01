@@ -84,7 +84,7 @@ __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long se
 }
 
 __global__ void
-simulate(double *A, double *dx2, double *Bounds, int *LUT, int *IndexArray, double *SWC, bool *conditionalExample,
+simulate(double *A, double *dx2, int *Bounds, int *LUT, int *IndexArray, double *SWC, bool *conditionalExample,
          curandStatePhilox4_32_10_t *state, int size, const int pairmax, int iter,
          bool debug) {
 
@@ -330,9 +330,9 @@ int main() {
 
     // todo: figure out why different bound size gives bug
 
-    double boundx = 20.0;
-    double boundy = 20.0;
-    double boundz = 20.0;
+    int boundx = 20;
+    int boundy = 20;
+    int boundz = 20;
 
     int bx = (int) (boundx);
     int by = (int) (boundy);
@@ -350,7 +350,7 @@ int main() {
      */
     // Create Host Pointers
     double *h_a;
-    double *hostBounds;
+    int *hostBounds;
     int *hostLookup;
     bool *hostLogicalVector;
     int *hostIndexArray;
@@ -360,7 +360,7 @@ int main() {
 
     // Alloc Memory for Host Pointers
     h_a = (double *) malloc(random_bytes);
-    hostBounds = (double *) malloc(3 * sizeof(double));
+    hostBounds = (int *) malloc(3 * sizeof(int));
     hostLogicalVector = (bool *) malloc(size * sizeof(bool));
     hostLookup = (int *) malloc(prod * sizeof(int));
     hostIndexArray = (int *) malloc(pairmax * 2 * npair * sizeof(int));
@@ -410,7 +410,7 @@ int main() {
     // Create Device Pointers
     curandStatePhilox4_32_10_t *deviceState;
     double *d_a;
-    double *deviceBounds;
+    int *deviceBounds;
     int *deviceLookup;
     bool *deviceLogicalVector;
     int *deviceIndexArray;
@@ -422,7 +422,7 @@ int main() {
     cudaMalloc((int **) &deviceIndexArray, pairmax * 2 * npair * sizeof(int));
     cudaMalloc((double **) &deviceSWC, 4 * indexsize * sizeof(double));
     cudaMalloc((double **) &d_a, random_bytes);
-    cudaMalloc((double **) &deviceBounds, 3 * sizeof(double));
+    cudaMalloc((int **) &deviceBounds, 3 * sizeof(int));
     cudaMalloc((bool **) &deviceLogicalVector, size * sizeof(bool));
     cudaMalloc((curandStatePhilox4_32_10_t * *) & deviceState, size * sizeof(curandStatePhilox4_32_10_t));
     cudaMalloc((double **) &devicedx2, 6 * iter * sizeof(double));
