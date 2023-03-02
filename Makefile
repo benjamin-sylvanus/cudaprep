@@ -6,7 +6,7 @@
 objects = ./src/particle.o ./src/datatemplate.o ./src/simulation.o ./src/simreader.o ./src/cpu_functions.o 
 all: $(objects)
 		nvcc  -arch=sm_75 -ccbin g++ -dc -m64 -o main.o -c main.cu
-		nvcc  -arch=sm_75 -dlink $(objects) main.o -lcublas -lcurand -o gpuCode.o
+		nvcc  -arch=sm_75 -dlink $(objects) main.o -o gpuCode.o
 		nvcc  -arch=sm_75 gpuCode.o main.o  $(objects) -o app
 
 %.o: %.cpp
