@@ -378,15 +378,21 @@ __device__ void particleINITDEVICE2(int gid,double *A, double *dx2, int *Bounds,
                         }
                     }
          */
+        double4 parent;
+        double4 child;
+        int2 vindex;
+        int id_test = s2i(floorpos, b_int3);
+        int test_lutvalue = nlut[id_test];
+        double dist2;
         if (parstate[gid].x)
         {
             for (int page = 0; page < i_int3.z; page++) {
                 int3 c_new = make_int3(test_lutvalue, 0, page);
                 int3 p_new = make_int3(test_lutvalue, 1, page);
-                vindex.x = NewIndex[s2i(c_new, i_int3)] - 1;
-                vindex.y = NewIndex[s2i(p_new, i_int3)] - 1;
-                printf("x: %4.1d y: %4.1d z: %4.1d\t index: %4.1d\n", c_new.x, c_new.y, c_new.z, vindex.x);
-                printf("x: %4.1d y: %4.1d z: %4.1d\t index: %4.1d\n", p_new.x, p_new.y, p_new.z, vindex.y);
+                 vindex.x = NewIndex[s2i(c_new, i_int3)] - 1;
+                 vindex.y = NewIndex[s2i(p_new, i_int3)] - 1;
+                // printf("x: %4.1d y: %4.1d z: %4.1d\t index: %4.1d\n", c_new.x, c_new.y, c_new.z, vindex.x);
+                // printf("x: %4.1d y: %4.1d z: %4.1d\t index: %4.1d\n", p_new.x, p_new.y, p_new.z, vindex.y);
 
 
                 if ((vindex.x) != -1) {
@@ -394,14 +400,14 @@ __device__ void particleINITDEVICE2(int gid,double *A, double *dx2, int *Bounds,
                     child.y = (double) d4swc[vindex.x].y;
                     child.z = (double) d4swc[vindex.x].z;
                     child.w = (double) d4swc[vindex.x].w;
-                    printf("CHILD \tx:%2.4f y:%2.4f z:%2.4f r:%2.4f\n", child.x, child.y, child.z, child.w);
+                    // printf("CHILD \tx:%2.4f y:%2.4f z:%2.4f r:%2.4f\n", child.x, child.y, child.z, child.w);
 
                     // extract parent values
                     parent.x = (double) d4swc[vindex.y].x;
                     parent.y = (double) d4swc[vindex.y].y;
                     parent.z = (double) d4swc[vindex.y].z;
                     parent.w = (double) d4swc[vindex.y].w;
-                    printf("PARENT \tx:%2.4f y:%2.4f z:%2.4f r:%2.4f\n", parent.x, parent.y, parent.z, parent.w);
+                    // printf("PARENT \tx:%2.4f y:%2.4f z:%2.4f r:%2.4f\n", parent.x, parent.y, parent.z, parent.w);
                     //distance squared between child parent
                     dist2 = ((parent.x - child.x) * (parent.x - child.x)) +
                             ((parent.y - child.y) * (parent.y - child.y)) +
@@ -413,7 +419,7 @@ __device__ void particleINITDEVICE2(int gid,double *A, double *dx2, int *Bounds,
                     // if it is inside the connection we don't need to check the remaining.
                     if (inside) {
                         // update the particles state
-                        parstate.y = 1;
+                        parstate[gid].y = 1;
 
                         // end for p loop
                         page = pairmax;
@@ -427,6 +433,7 @@ __device__ void particleINITDEVICE2(int gid,double *A, double *dx2, int *Bounds,
                     cont = false;
                     // end for p loop
                     page = pairmax;
+                    parstate[gid].y = 1;
                 }
             }
         }
@@ -630,6 +637,59 @@ simulate(double *A, double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state,
                     // scuffed sub2ind function
                     int id_test = s2i(floorpos, b_int3);
                     int test_lutvalue = nlut[id_test];
+                    int2 vindex;
+                    double4 parent; double4 child; double dist2;
+                    for (int page = 0; page < i_int3.z; page++) {
+                        int3 c_new = make_int3(test_lutvalue, 0, page);
+                        int3 p_new = make_int3(test_lutvalue, 1, page);
+                        vindex.x = NewIndex[s2i(c_new, i_int3)] - 1;
+                        vindex.y = NewIndex[s2i(p_new, i_int3)] - 1;
+                        // printf("x: %4.1d y: %4.1d z: %4.1d\t index: %4.1d\n", c_new.x, c_new.y, c_new.z, vindex.x);
+                        // printf("x: %4.1d y: %4.1d z: %4.1d\t index: %4.1d\n", p_new.x, p_new.y, p_new.z, vindex.y);
+
+
+                        if ((vindex.x) != -1) {
+                            child.x = (double) d4swc[vindex.x].x;
+                            child.y = (double) d4swc[vindex.x].y;
+                            child.z = (double) d4swc[vindex.x].z;
+                            child.w = (double) d4swc[vindex.x].w;
+                            // printf("CHILD \tx:%2.4f y:%2.4f z:%2.4f r:%2.4f\n", child.x, child.y, child.z, child.w);
+
+                            // extract parent values
+                            parent.x = (double) d4swc[vindex.y].x;
+                            parent.y = (double) d4swc[vindex.y].y;
+                            parent.z = (double) d4swc[vindex.y].z;
+                            parent.w = (double) d4swc[vindex.y].w;
+                            // printf("PARENT \tx:%2.4f y:%2.4f z:%2.4f r:%2.4f\n", parent.x, parent.y, parent.z, parent.w);
+                            //distance squared between child parent
+                            dist2 = ((parent.x - child.x) * (parent.x - child.x)) +
+                                    ((parent.y - child.y) * (parent.y - child.y)) +
+                                    ((parent.z - child.z) * (parent.z - child.z));
+
+                            // determine whether particle is inside this connection
+                            bool inside = swc2v(nextpos, child, parent, dist2);
+
+                            // if it is inside the connection we don't need to check the remaining.
+                            if (inside) {
+                                // update the particles state
+                                parstate[gid].y = 1;
+
+                                // end for p loop
+                                page = pairmax;
+                                // cont = false;
+                            }
+                        }
+
+                            // if the value of the index array is -1 we have checked all pairs for this particle.
+                        else
+                        {
+                            // cont = false;
+                            // end for p loop
+                            page = pairmax;
+                            parstate[gid].y = 1;
+                        }
+                    }
+
 
                     /**
                      * @brief Indexing Index Array
@@ -645,8 +705,8 @@ simulate(double *A, double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state,
 
                     //kernel call
                     // int2 parstate,double3 nextpos, double4 * d4swc, int * NewIndex, int test_lutvalue, int size
-                    parallelpairs<<<2,2>>>(parstate, i_int3, nextpos , d4swc, NewIndex, test_lutvalue, gid);
-                    __syncthreads();
+                    // parallelpairs<<<2,2>>>(parstate, i_int3, nextpos , d4swc, NewIndex, test_lutvalue, gid);
+                    // __syncthreads();
                 }
 
                 // determine if step executes
@@ -718,7 +778,7 @@ int main() {
     /**
      * Read Simulation and Initialize Object
      */
-    std::string path = "/homes/9/bs244/Desktop/cudacodes/temp/cudaprep/data";
+    std::string path = "/autofs/space/symphony_002/users/BenSylvanus/cuda/cudaprep/data";
     simreader reader(&path);
     simulation sim(reader);
     double simparam[10];
@@ -1026,7 +1086,7 @@ int main() {
       mdx_2[6*i+3] = (hostdx2[6*i+3]/size)/(2.0*t[i]);
       mdx_2[6*i+4] = (hostdx2[6*i+4]/size)/(2.0*t[i]);
       mdx_2[6*i+5] = (hostdx2[6*i+5]/size)/(2.0*t[i]);
-      printf("%f\n",t[i]);
+      // printf("%f\n",t[i]);
     }
 
 
