@@ -20,28 +20,6 @@ using std::cout;
 using std::cin;
 using std::endl;
 
-__device__ double atomAdd(double *address, double val) {
-    unsigned long long int *address_as_ull =
-            (unsigned long long int *) address;
-    unsigned long long int old = *address_as_ull, assumed;
-
-    do {
-
-        assumed = old;
-
-
-        old = atomicCAS(address_as_ull, assumed,
-                        __double_as_longlong(val +
-                                             __longlong_as_double(assumed)));
-
-        // printf("old,val = [%f,%f]\n",old,val);
-        // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
-    } while (assumed != old);
-
-
-    return __longlong_as_double(old);
-}
-
 __device__ int s2i(int3 i, int3 b) {
     return 0 + b.x * (b.y * i.z + i.y) + i.x;
 }
@@ -181,9 +159,6 @@ __device__ double3 particleINITDEVICE2(int gid, double *dx2, int *Bounds, curand
                 int3 p_new = make_int3(test_lutvalue, 1, page);
                 vindex.x = NewIndex[s2i(c_new, i_int3)] - 1;
                 vindex.y = NewIndex[s2i(p_new, i_int3)] - 1;
-                // printf("x: %4.1d y: %4.1d z: %4.1d\t index: %4.1d\n", c_new.x, c_new.y, c_new.z, vindex.x);
-                // printf("x: %4.1d y: %4.1d z: %4.1d\t index: %4.1d\n", p_new.x, p_new.y, p_new.z, vindex.y);
-
 
                 if ((vindex.x) != -1) {
                     child = make_double4(d4swc[vindex.x].x, d4swc[vindex.x].y, d4swc[vindex.x].z, d4swc[vindex.x].w);
@@ -396,11 +371,9 @@ simulate(double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state, double *Si
             d2.x = fabs((A.x - xnot.x) * vsize);
             d2.y = fabs((A.y - xnot.y) * vsize);
             d2.z = fabs((A.z - xnot.z) * vsize);
-            // printf("gx.x = %d \t A[gx.x] = %f \t xnot.x = %f \t d2.x=%f\n",gx.x,A[gx.x],xnot.x,d2.x);
 
             // diffusion tensor
             atomicAdd(&dx2[6 * i + 0], d2.x * d2.x);
-            // printf("gx.x = %d \t A[gx.x] = %f \t xnot.x = %f \t d2.x=%f\t d2.x^2=%f \t dx2[x^2]=%f \n",gx.x,A.x,xnot.x,d2.x, d2.x*d2.x, dx2[6*i+0]);
             atomicAdd(&dx2[6 * i + 1], d2.x * d2.y);
             atomicAdd(&dx2[6 * i + 2], d2.x * d2.z);
             atomicAdd(&dx2[6 * i + 3], d2.y * d2.y);
@@ -413,7 +386,7 @@ simulate(double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state, double *Si
 }
 
 void setupSimulation() {
-    std::string path = "/autofs/space/symphony_002/users/BenSylvanus/cuda/cudaprep/data";
+    std::string path = "./data";
     simreader reader(&path);
     simulation sim(reader);
     sim.setStep_num(100);
@@ -431,7 +404,7 @@ int main() {
     /**
      * Read Simulation and Initialize Object
      */
-    std::string path = "/autofs/space/symphony_002/users/BenSylvanus/cuda/cudaprep/data";
+    std::string path = "./data";
     simreader reader(&path);
     simulation sim(reader);
     double simparam[10];
@@ -520,7 +493,6 @@ int main() {
      * - Set Values
      */
     // Create Host Pointers
-    // double *h_a;
     int *hostBounds;
     double *hostdx2;
     double *hostSimP;
@@ -530,7 +502,6 @@ int main() {
     double4 *hostD4Swc;
 
     // Alloc Memory for Host Pointers
-    // h_a = (double *) malloc(random_bytes);
     hostBounds = (int *) malloc(3 * sizeof(int));
     hostdx2 = (double *) malloc(6 * iter * sizeof(double));
     hostSimP = (double *) malloc(10 * sizeof(double));
@@ -596,7 +567,6 @@ int main() {
      */
     // Create Device Pointers
     curandStatePhilox4_32_10_t *deviceState;
-    // double *d_a;
     double *devicedx2;
     int *deviceBounds;
     double *deviceSimP;
@@ -607,7 +577,6 @@ int main() {
 
     clock_t start = clock();
     // Allocate Memory on Device
-    // cudaMalloc((double **) &d_a, random_bytes);
     cudaMalloc((double **) &devicedx2, 6 * iter * sizeof(double));
     cudaMalloc((int **) &deviceBounds, 3 * sizeof(int));
     cudaMalloc((curandStatePhilox4_32_10_t * *) & deviceState, size * sizeof(curandStatePhilox4_32_10_t));
@@ -651,7 +620,6 @@ int main() {
     /**
      * Copy Results From Device to Host
      */
-    // cudaMemcpy(h_a, d_a, random_bytes, cudaMemcpyDeviceToHost);
     cudaMemcpy(hostdx2, devicedx2, 6 * iter * sizeof(double), cudaMemcpyDeviceToHost);
     end = clock();
     gpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
@@ -660,7 +628,6 @@ int main() {
     /**
      * Free Device Data
      */
-    // cudaFree(d_a);
     cudaFree(deviceBounds);
     cudaFree(deviceState);
     cudaFree(devicedx2);
@@ -675,7 +642,6 @@ int main() {
     We need to write
     hostdx2
     */
-    // Save results
     double t[iter];
     double tstep = hostSimP[8];
     double mdx_2[6 * iter];
@@ -688,7 +654,6 @@ int main() {
         mdx_2[6 * i + 4] = (hostdx2[6 * i + 4] / size) / (2.0 * t[i]);
         mdx_2[6 * i + 5] = (hostdx2[6 * i + 5] / size) / (2.0 * t[i]);
     }
-
 
     std::ofstream fdx2out("./results/dx2.txt");
     std::ofstream fmdx2out("./results/mdx2.txt");
@@ -718,7 +683,6 @@ int main() {
     /**
      * Free Host Data
      */
-    // free(h_a);
     free(hostBounds);
     free(hostdx2);
     free(hostSimP);
