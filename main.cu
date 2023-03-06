@@ -1,9 +1,11 @@
 #include "./src/simreader.h"
 #include "./src/simulation.h"
 #include "./src/particle.h"
+#include "./src/funcs.h"
 #include "vector"
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
+#include "cuda_runtime_api.h"
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,7 +14,6 @@
 #include <cstring>
 #include <curand.h>
 #include <curand_kernel.h>
-#include "cuda_runtime_api.h"
 #include <fstream>
 
 
@@ -20,199 +21,27 @@ using std::cout;
 using std::cin;
 using std::endl;
 
-__device__ int s2i(int3 i, int3 b) {
-    return 0 + b.x * (b.y * i.z + i.y) + i.x;
-}
-
-__device__ bool swc2v(double3 nextpos, double4 child, double4 parent, double dist) {
-    double x0 = nextpos.x;
-    double y0 = nextpos.y;
-    double z0 = nextpos.z;
-
-    double x1 = child.x;
-    double y1 = child.y;
-    double z1 = child.z;
-    double r1 = child.w;
-    double x2 = parent.x;
-    double y2 = parent.y;
-    double z2 = parent.z;
-    double r2 = parent.w;
-
-    double t = ((x0 - x1) * (x2 - x1) + (y0 - y1) * (y2 - y1) + (z0 - z1) * (z2 - z1)) / dist;
-    double x = x1 + (x2 - x1) * t;
-    double y = y1 + (y2 - y1) * t;
-    double z = z1 + (z2 - z1) * t;
-
-    bool list1;
-    if (dist < (r1 * r1)) {
-        list1 = false;
-    } else {
-        list1 = (x - x1) * (x - x2) + (y - y1) * (y - y2) + (z - z1) * (z - z2) < 0.0;
-    }
-
-    bool pos1;
-    bool pos;
-    if (list1) {
-        double dist2 = ((x0 - x) * (x0 - x)) + ((y0 - y) * (y0 - y)) + ((z0 - z) * (z0 - z));
-
-        /**
-         * @brief calculation for tangent line
-         * <li> r = r1 + sqrt((x-x1).^2 + (y-y1).^2 + (z-z1).^2) / sqrt((x2-x1)^2+(y2-y1)^2+(z2-z1)^2) * (r2-r1) </li>
-         * <li> r = ( c + r2 ) / (sqrt ( 1 - ( |r1-r2 | / l ) ) </li>
-         * <li>c = ( |r1 - r2| * l ) / L </li>
-        *
-        */
-        double rd = abs(r1 - r2);
-
-        // distance from orthogonal vector to p2
-        double l = sqrt(((x - x2) * (x - x2)) + ((y - y2) * (y - y2)) + ((z - z2) * (z - z2)));
-
-        // distance from p1 -> p2
-        double L = sqrt(dist);
-
-        double c = (rd * l) / L;
-        double r = (c + r2) / sqrt(1 - ((rd / L) * (rd / L)));
-        pos1 = dist2 < (r * r);
-        pos = pos1;
-    } else {
-        pos1 = ((((x0 - x1) * (x0 - x1)) + ((y0 - y1) * (y0 - y1)) + ((z0 - z1) * (z0 - z1))) < (r1 * r1)) ||
-               ((((x0 - x2) * (x0 - x2)) + ((y0 - y2) * (y0 - y2)) + ((z0 - z2) * (z0 - z2))) < ((r2 * r2)));
-        pos = pos1;
-    }
-
-    return pos;
-}
-
-
 __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long seed) {
     int idx = threadIdx.x + blockDim.x * blockIdx.x;
     curand_init(seed, idx, 0, &state[idx]);
 }
 
-
-__device__ double3 particleINITDEVICE2(int gid, double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state,
-                                       double *SimulationParams, double4 *d4swc, int *nlut, int *NewIndex,
-                                       int *IndexSize, int size, int iter, bool debug) {
-    int3 gx;
-    gx.x = 3 * gid + 0;
-    gx.y = 3 * gid + 1;
-    gx.z = 3 * gid + 2;
-
-    double3 nextpos;
-
-    int3 upper;
-    int3 lower;
-    int3 floorpos;
-    int3 b_int3;
-    b_int3.x = Bounds[0];
-    b_int3.y = Bounds[1];
-    b_int3.z = Bounds[2];
-    int3 i_int3;
-    i_int3.x = IndexSize[0];
-    i_int3.y = IndexSize[1];
-    i_int3.z = IndexSize[2];
-    curandStatePhilox4_32_10_t localstate = state[gid];
-    double4 xrandom;
-    int2 parstate;
-    double3 A;
-    parstate.y = 0;
-    int ntrys = 0;
-    int nloops = 0;
-    bool cont = true;
-    while (cont) {
-        // init local state var
-
-        xrandom = curand_uniform4_double(&localstate);
-
-        // set particle initial position
-        A.x = xrandom.x * (double) (Bounds[0] - 4);
-        A.y = xrandom.y * (double) (Bounds[1] - 4);
-        A.z = xrandom.z * (double) (Bounds[2] - 4);
-
-        // floor of position -> check voxels
-        floorpos.x = (int) A.x;
-        floorpos.y = (int) A.y;
-        floorpos.z = (int) A.z;
-
-        // upper bounds of lookup table
-        upper.x = floorpos.x < (Bounds[0] - 4);
-        upper.y = floorpos.y < (Bounds[1] - 4);
-        upper.z = floorpos.z < (Bounds[2] - 4);
-
-        // lower bounds of lookup table
-        lower.x = floorpos.x >= 4;
-        lower.y = floorpos.y >= 4;
-        lower.z = floorpos.z >= 4;
-
-        // position inside the bounds of volume -> state of next position true : false
-        parstate.x = (lower.x && lower.y && lower.z && upper.x && upper.y && upper.z) ? 1 : 0;
-
-        double4 parent;
-        double4 child;
-        int2 vindex;
-        int id_test = s2i(floorpos, b_int3);
-        int test_lutvalue = nlut[id_test];
-        double dist2;
-        if (parstate.x) {
-            for (int page = 0; page < i_int3.z; page++) {
-                int3 c_new = make_int3(test_lutvalue, 0, page);
-                int3 p_new = make_int3(test_lutvalue, 1, page);
-                vindex.x = NewIndex[s2i(c_new, i_int3)] - 1;
-                vindex.y = NewIndex[s2i(p_new, i_int3)] - 1;
-
-                if ((vindex.x) != -1) {
-                    child = make_double4(d4swc[vindex.x].x, d4swc[vindex.x].y, d4swc[vindex.x].z, d4swc[vindex.x].w);
-                    parent = make_double4(d4swc[vindex.y].x, d4swc[vindex.y].y, d4swc[vindex.y].z, d4swc[vindex.y].w);
-
-
-                    //distance squared between child parent
-                    dist2 = ((parent.x - child.x) * (parent.x - child.x)) +
-                            ((parent.y - child.y) * (parent.y - child.y)) +
-                            ((parent.z - child.z) * (parent.z - child.z));
-
-                    // determine whether particle is inside this connection
-                    bool inside = swc2v(nextpos, child, parent, dist2);
-
-                    // if it is inside the connection we don't need to check the remaining.
-                    if (inside) {
-                        // update the particles state
-                        parstate.y = 1;
-                        // end for p loop
-                        page = i_int3.z;
-                        cont = false;
-                    }
-                }
-
-                    // if the value of the index array is -1 we have checked all pairs for this particle.
-                else {
-                    cont = false;
-                    // end for p loop
-                    page = i_int3.z;
-                    parstate.y = 1;
-                }
-            }
-        }
-    }
-    return A;
-}
-
-
 __global__ void
-simulate(double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state, double *SimulationParams,
+simulate(double *savedata, double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state, double *SimulationParams,
          double4 *d4swc, int *nlut, int *NewIndex, int *IndexSize, int size, int iter, bool debug) {
     int gid = threadIdx.x + blockDim.x * blockIdx.x;
 
     if (gid < size) {
 
-        double particle_num = SimulationParams[0];
-        double step_num = SimulationParams[1];
+        // double particle_num = SimulationParams[0];
+        // double step_num = SimulationParams[1];
         double step_size = SimulationParams[2];
         double perm_prob = SimulationParams[3];
         double init_in = SimulationParams[4];
-        double D0 = SimulationParams[5];
-        double d = SimulationParams[6];
-        double scale = SimulationParams[7];
-        double tstep = SimulationParams[8];
+        // double D0 = SimulationParams[5];
+        // double d = SimulationParams[6];
+        // double scale = SimulationParams[7];
+        // double tstep = SimulationParams[8];
         double vsize = SimulationParams[9];
         int2 parstate;
 
@@ -257,6 +86,8 @@ simulate(double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state, double *Si
         // record initial position
         xnot = make_double3(A.x, A.y, A.z);
 
+
+
         // flag is initially false
         flag = 0;
 
@@ -266,26 +97,25 @@ simulate(double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state, double *Si
 
         // iterate over steps
         for (int i = 0; i < iter; i++) {
+
             if (flag == 0) {
                 xi = curand_uniform4_double(&localstate);
+
+
                 nextpos.x = A.x + ((2.0 * xi.x - 1.0) * step);
                 nextpos.y = A.y + ((2.0 * xi.y - 1.0) * step);
                 nextpos.z = A.z + ((2.0 * xi.z - 1.0) * step);
 
+
                 // floor of next position -> check voxels
-                floorpos.x = (int) nextpos.x;
-                floorpos.y = (int) nextpos.y;
-                floorpos.z = (int) nextpos.z;
+                floorpos = make_int3((int) nextpos.x, (int) nextpos.y, (int) nextpos.z);
+
 
                 // upper bounds of lookup table
-                upper.x = floorpos.x < Bounds[0];
-                upper.y = floorpos.y < Bounds[1];
-                upper.z = floorpos.z < Bounds[2];
+                upper = make_int3(floorpos.x < b_int3.x, floorpos.y < b_int3.y, floorpos.x < b_int3.z);
 
                 // lower bounds of lookup table
-                lower.x = floorpos.x >= 0;
-                lower.y = floorpos.y >= 0;
-                lower.z = floorpos.z >= 0;
+                lower = make_int3(floorpos.x >= 0, floorpos.y >= 0, floorpos.z >= 0);
 
                 // position inside the bounds of volume -> state of next position true : false
                 parstate.y = (lower.x && lower.y && lower.z && upper.x && upper.y && upper.z) ? 1 : 0;
@@ -307,20 +137,10 @@ simulate(double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state, double *Si
                         vindex.x = NewIndex[s2i(c_new, i_int3)] - 1;
                         vindex.y = NewIndex[s2i(p_new, i_int3)] - 1;
                         if ((vindex.x) != -1) {
-                            child.x = (double) d4swc[vindex.x].x;
-                            child.y = (double) d4swc[vindex.x].y;
-                            child.z = (double) d4swc[vindex.x].z;
-                            child.w = (double) d4swc[vindex.x].w;
-
-                            // extract parent values
-                            parent.x = (double) d4swc[vindex.y].x;
-                            parent.y = (double) d4swc[vindex.y].y;
-                            parent.z = (double) d4swc[vindex.y].z;
-                            parent.w = (double) d4swc[vindex.y].w;
-                            //distance squared between child parent
-                            dist2 = ((parent.x - child.x) * (parent.x - child.x)) +
-                                    ((parent.y - child.y) * (parent.y - child.y)) +
-                                    ((parent.z - child.z) * (parent.z - child.z));
+                            child = d4swc[vindex.x];
+                            parent = d4swc[vindex.y];
+                            dist2 = pow(parent.x - child.x, 2) + pow(parent.y - child.y, 2) +
+                                    pow(parent.z - child.z, 2);
 
                             // determine whether particle is inside this connection
                             bool inside = swc2v(nextpos, child, parent, dist2);
@@ -347,19 +167,12 @@ simulate(double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state, double *Si
                 // determine if step executes
                 completes = xi.w < permprob;
                 if (parstate.y) {
-                    // printf("check\n");
-                    A.x = nextpos.x;
-                    A.y = nextpos.y;
-                    A.z = nextpos.z;
+                    A = nextpos;
                 } else {
                     if (completes && parstate.x) {
-                        printf("ESCAPEE ALERT!\n");
-                        A.x = nextpos.x;
-                        A.y = nextpos.y;
-                        A.z = nextpos.z;
+                        A = nextpos;
                     }
                     if (!completes && parstate.x && !parstate.y) {
-                        // printf("REJECTION ALERT!\n");
                         flag = true;
                     }
                 }
@@ -380,6 +193,16 @@ simulate(double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state, double *Si
             atomicAdd(&dx2[6 * i + 4], d2.y * d2.z);
             atomicAdd(&dx2[6 * i + 5], d2.z * d2.z);
 
+
+            // 0 + b.x * (b.y * i.z + i.y) + i.x;
+            int3 dataindex = make_int3(iter, size, 3);
+            int3 dataid;
+            dataid.x = dataindex.x * (dataindex.y * 0 + i) + gid;
+            dataid.y = dataindex.x * (dataindex.y * 1 + i) + gid;
+            dataid.z = dataindex.x * (dataindex.y * 2 + i) + gid;
+            savedata[dataid.x] = A.x;
+            savedata[dataid.y] = A.y;
+            savedata[dataid.z] = A.z;
         }
 
     }
@@ -424,9 +247,6 @@ int main() {
     int block_size = 128;
     dim3 block(block_size);
     dim3 grid((size / block.x) + 1);
-
-    // we could convert our devices random vector to a double3
-    int random_bytes = 3 * size * sizeof(double);
 
     // todo: figure out why different bound size gives bug
     std::vector <uint64_t> bounds = sim.getbounds();
@@ -500,6 +320,7 @@ int main() {
     int *hostNewIndex;
     int *hostIndexSize;
     double4 *hostD4Swc;
+    double *hostAllData;
 
     // Alloc Memory for Host Pointers
     hostBounds = (int *) malloc(3 * sizeof(int));
@@ -509,23 +330,11 @@ int main() {
     hostNewLut = (int *) malloc(prod * sizeof(int));
     hostNewIndex = (int *) malloc(newindexsize * sizeof(int));
     hostIndexSize = (int *) malloc(3 * sizeof(int));
-
-
-
+    hostAllData = (double *) malloc(3 * iter * size * sizeof(double));
 
     // Set Values for Host
-    memset(hostdx2, 1.0, 6 * iter * sizeof(double));
-
-    for (int i = 0; i < iter; i++) {
-        hostdx2[i * 6 + 0] = 0.00;
-        hostdx2[i * 6 + 1] = 0.00;
-        hostdx2[i * 6 + 2] = 0.00;
-        hostdx2[i * 6 + 3] = 0.00;
-        hostdx2[i * 6 + 4] = 0.00;
-        hostdx2[i * 6 + 5] = 0.00;
-
-    }
-
+    memset(hostdx2, 0.0, 6 * iter * sizeof(double));
+    memset(hostAllData, 0.0, 3 * iter * size * sizeof(double));
 
     for (int i = 0; i < 3; i++) {
         int value = index_dims[i];
@@ -574,6 +383,7 @@ int main() {
     int *deviceNewLut;
     int *deviceNewIndex;
     int *deviceIndexSize;
+    double *deviceAllData;
 
     clock_t start = clock();
     // Allocate Memory on Device
@@ -585,6 +395,7 @@ int main() {
     cudaMalloc((int **) &deviceNewLut, prod * sizeof(int));
     cudaMalloc((int **) &deviceNewIndex, newindexsize * sizeof(int));
     cudaMalloc((int **) &deviceIndexSize, 3 * sizeof(int));
+    cudaMalloc((double **) &deviceAllData, 3 * iter * size * sizeof(double));
 
 
 
@@ -597,6 +408,7 @@ int main() {
     cudaMemcpy(deviceNewLut, hostNewLut, prod * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceNewIndex, hostNewIndex, newindexsize * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceIndexSize, hostIndexSize, 3 * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(deviceAllData, hostAllData, 3 * iter * size * sizeof(double), cudaMemcpyHostToDevice);
 
 
     /**
@@ -608,7 +420,8 @@ int main() {
     /**
      * Call Kernel
     */
-    simulate<<<grid, block>>>(devicedx2, deviceBounds, deviceState, deviceSimP, deviced4Swc,
+
+    simulate<<<grid, block>>>(deviceAllData, devicedx2, deviceBounds, deviceState, deviceSimP, deviced4Swc,
                               deviceNewLut, deviceNewIndex,
                               deviceIndexSize, size, iter, debug);
     // Wait for results
@@ -621,6 +434,8 @@ int main() {
      * Copy Results From Device to Host
      */
     cudaMemcpy(hostdx2, devicedx2, 6 * iter * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(hostAllData, deviceAllData, 3 * iter * size * sizeof(double), cudaMemcpyDeviceToHost);
+
     end = clock();
     gpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
     printf("kernel took %f seconds\n", gpu_time_used);
@@ -635,6 +450,7 @@ int main() {
     cudaFree(deviced4Swc);
     cudaFree(deviceNewIndex);
     cudaFree(deviceIndexSize);
+    cudaFree(deviceAllData);
 
 
     /**
@@ -654,6 +470,7 @@ int main() {
         mdx_2[6 * i + 4] = (hostdx2[6 * i + 4] / size) / (2.0 * t[i]);
         mdx_2[6 * i + 5] = (hostdx2[6 * i + 5] / size) / (2.0 * t[i]);
     }
+
 
     std::ofstream fdx2out("./results/dx2.txt");
     std::ofstream fmdx2out("./results/mdx2.txt");
@@ -679,6 +496,16 @@ int main() {
 
     fdx2out.close();
     fmdx2out.close();
+    int3 dataindex = make_int3(iter, size, 3);
+    int3 dataid;
+    for (int j = 0; j < size; j++) {
+        for (int i = 0; i < iter; i++) {
+            dataid.x = dataindex.x * (dataindex.y * 0 + i) + j;
+            dataid.y = dataindex.x * (dataindex.y * 1 + i) + j;
+            dataid.z = dataindex.x * (dataindex.y * 2 + i) + j;
+            // printf("particle(id: %d,step: %d): %f %f %f\n",j,i,hostAllData[dataid.x],hostAllData[dataid.y],hostAllData[dataid.z]);
+        }
+    }
 
     /**
      * Free Host Data
@@ -689,5 +516,6 @@ int main() {
     free(hostD4Swc);
     free(hostNewIndex);
     free(hostIndexSize);
+    free(hostAllData);
     return 0;
 }
