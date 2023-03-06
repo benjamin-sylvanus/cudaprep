@@ -633,8 +633,6 @@ int main() {
     /**
      * Initalize Random Stream
      */
-
-
     // option for printing in kernel
     bool debug = false;
 
@@ -658,16 +656,6 @@ int main() {
     end = clock();
     gpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
     printf("kernel took %f seconds\n", gpu_time_used);
-
-    for (int i = 0; i < size; i++) {
-        // printf("x: %f \t y: %f \t z: %f\n",h_a[3*i+0], h_a[3*i+1], h_a[3*i+2]);
-
-    }
-
-    for (int i = 0; i < iter; i += 100) {
-        // printf("xx: %f \t xy: %f \t xz: %f\t yy: %f\t yz: %f\t zz: %f\t \n", hostdx2[i * 6 + 0],
-        // hostdx2[i * 6 + 1], hostdx2[i * 6 + 2], hostdx2[i * 6 + 3], hostdx2[i * 6 + 4], hostdx2[i * 6 + 5]);
-    }
 
     /**
      * Free Device Data
