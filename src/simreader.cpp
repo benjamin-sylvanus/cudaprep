@@ -65,14 +65,3 @@ std::vector<double> simreader::readconstants()
 
 
 }
-
-
-
-
-
-
-
-
-
-
-
