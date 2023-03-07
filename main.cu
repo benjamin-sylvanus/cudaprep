@@ -16,7 +16,6 @@
 #include <curand_kernel.h>
 #include <fstream>
 
-
 using std::cout;
 using std::cin;
 using std::endl;
@@ -32,39 +31,25 @@ simulate(double *savedata, double *dx2, int *Bounds, curandStatePhilox4_32_10_t 
     int gid = threadIdx.x + blockDim.x * blockIdx.x;
 
     if (gid < size) {
-
-        // double particle_num = SimulationParams[0];
-        // double step_num = SimulationParams[1];
         double step_size = SimulationParams[2];
         double perm_prob = SimulationParams[3];
         double init_in = SimulationParams[4];
-        // double D0 = SimulationParams[5];
-        // double d = SimulationParams[6];
-        // double scale = SimulationParams[7];
-        // double tstep = SimulationParams[8];
         double vsize = SimulationParams[9];
-        int2 parstate;
-
-        int3 gx;
-        gx.x = 3 * gid + 0;
-        gx.y = 3 * gid + 1;
-        gx.z = 3 * gid + 2;
-
         double3 A;
+        int2 parstate;
+        int3 gx = make_int3(3 * gid + 0, 3 * gid + 1, 3 * gid + 2);
 
-        // if our id is within our range of values;
         // define variables for loop
         double4 xi;
         double3 nextpos;
         double3 xnot;
-        double3 d2 = make_double3(0.0, 0.0, 0.0);
 
         int3 upper;
         int3 lower;
         int3 floorpos;
         int3 b_int3 = make_int3(Bounds[0], Bounds[1], Bounds[2]);
         int3 i_int3 = make_int3(IndexSize[0], IndexSize[1], IndexSize[2]);
-
+        double3 d2 = make_double3(0.0, 0.0, 0.0);
         bool completes;
         bool flag;
 
@@ -76,40 +61,31 @@ simulate(double *savedata, double *dx2, int *Bounds, curandStatePhilox4_32_10_t 
         curandStatePhilox4_32_10_t localstate = state[gid];
         xi = curand_uniform4_double(&localstate);
 
-        /**
-         * @brief Initialize Random Positions:
-         *
-        */
-        A = particleINITDEVICE2(gid, dx2, Bounds, state, SimulationParams, d4swc, nlut, NewIndex, IndexSize,
+        // initialize position inside cell
+        A = initPosition(gid, dx2, Bounds, state, SimulationParams, d4swc, nlut, NewIndex, IndexSize,
                                 size, iter, debug);
 
         // record initial position
         xnot = make_double3(A.x, A.y, A.z);
 
-
-
         // flag is initially false
         flag = 0;
 
         // state is based on intialization conditions if particles are required to start inside then parstate -> [1,1]
-        parstate.x = 1;
-        parstate.y = 1;
+        parstate = make_int2(1, 1);
 
         // iterate over steps
         for (int i = 0; i < iter; i++) {
 
             if (flag == 0) {
+                // generate uniform randoms for step
                 xi = curand_uniform4_double(&localstate);
 
-
-                nextpos.x = A.x + ((2.0 * xi.x - 1.0) * step);
-                nextpos.y = A.y + ((2.0 * xi.y - 1.0) * step);
-                nextpos.z = A.z + ((2.0 * xi.z - 1.0) * step);
-
+                // set next position
+                setNextPos(nextpos,A,xi,step);
 
                 // floor of next position -> check voxels
                 floorpos = make_int3((int) nextpos.x, (int) nextpos.y, (int) nextpos.z);
-
 
                 // upper bounds of lookup table
                 upper = make_int3(floorpos.x < b_int3.x, floorpos.y < b_int3.y, floorpos.x < b_int3.z);
@@ -155,7 +131,7 @@ simulate(double *savedata, double *dx2, int *Bounds, curandStatePhilox4_32_10_t 
                             }
                         }
 
-                            // if the value of the index array is -1 we have checked all pairs for this particle.
+                        // if the value of the index array is -1 we have checked all pairs for this particle.
                         else {
                             // end for p loop
                             page = i_int3.z;
@@ -179,32 +155,11 @@ simulate(double *savedata, double *dx2, int *Bounds, curandStatePhilox4_32_10_t 
             } else {
                 flag = false;
             }
-
-
-            d2.x = fabs((A.x - xnot.x) * vsize);
-            d2.y = fabs((A.y - xnot.y) * vsize);
-            d2.z = fabs((A.z - xnot.z) * vsize);
-
-            // diffusion tensor
-            atomicAdd(&dx2[6 * i + 0], d2.x * d2.x);
-            atomicAdd(&dx2[6 * i + 1], d2.x * d2.y);
-            atomicAdd(&dx2[6 * i + 2], d2.x * d2.z);
-            atomicAdd(&dx2[6 * i + 3], d2.y * d2.y);
-            atomicAdd(&dx2[6 * i + 4], d2.y * d2.z);
-            atomicAdd(&dx2[6 * i + 5], d2.z * d2.z);
-
-
-            // 0 + b.x * (b.y * i.z + i.y) + i.x;
-            int3 dataindex = make_int3(iter, size, 3);
-            int3 dataid;
-            dataid.x = dataindex.x * (dataindex.y * 0 + i) + gid;
-            dataid.y = dataindex.x * (dataindex.y * 1 + i) + gid;
-            dataid.z = dataindex.x * (dataindex.y * 2 + i) + gid;
-            savedata[dataid.x] = A.x;
-            savedata[dataid.y] = A.y;
-            savedata[dataid.z] = A.z;
+            /**
+             * Store Results Function
+             */
+            diffusionTensor(A, xnot, vsize, dx2, savedata, d2, i);
         }
-
     }
 }
 
@@ -221,6 +176,13 @@ int main() {
 
     setupSimulation();
     system("clear");
+
+    cout << "---Welcome---\n";
+    cout << "1. Standard Simulation: \n";
+    cout << "2. Change Configuration: \n";
+    cout << "3. Custom Configuration: \n";
+    cout << "Command List: \n";
+
     int size = 10;
     int iter = 10;
 
@@ -231,8 +193,19 @@ int main() {
     simreader reader(&path);
     simulation sim(reader);
     double simparam[10];
+    /**
+     <li> particle_num = SimulationParams[0] </li>
+     <li> step_num = SimulationParams[1] </li>
+     <li> step_size = SimulationParams[2] </li>
+     <li> perm_prob = SimulationParams[3] </li>
+     <li> init_in = SimulationParams[4] </li>
+     <li> D0 = SimulationParams[5] </li>
+     <li> d = SimulationParams[6] </li>
+     <li> scale = SimulationParams[7] </li>
+     <li> tstep = SimulationParams[8] </li>
+     <li> vsize = SimulationParams[9] </li>
+     */
     std::vector<double> simulationparams = sim.getParameterdata();
-
     for (int i = 0; i < 10; i++) {
         double value = simulationparams[i];
         simparam[i] = value;
@@ -397,8 +370,6 @@ int main() {
     cudaMalloc((int **) &deviceIndexSize, 3 * sizeof(int));
     cudaMalloc((double **) &deviceAllData, 3 * iter * size * sizeof(double));
 
-
-
     // Set Values for Device
     cudaMemcpy(devicedx2, hostdx2, 6 * iter * sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceBounds, hostBounds, 3 * sizeof(int), cudaMemcpyHostToDevice);
@@ -410,7 +381,6 @@ int main() {
     cudaMemcpy(deviceIndexSize, hostIndexSize, 3 * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceAllData, hostAllData, 3 * iter * size * sizeof(double), cudaMemcpyHostToDevice);
 
-
     /**
      * Initalize Random Stream
      */
@@ -420,7 +390,6 @@ int main() {
     /**
      * Call Kernel
     */
-
     simulate<<<grid, block>>>(deviceAllData, devicedx2, deviceBounds, deviceState, deviceSimP, deviced4Swc,
                               deviceNewLut, deviceNewIndex,
                               deviceIndexSize, size, iter, debug);
@@ -470,7 +439,6 @@ int main() {
         mdx_2[6 * i + 4] = (hostdx2[6 * i + 4] / size) / (2.0 * t[i]);
         mdx_2[6 * i + 5] = (hostdx2[6 * i + 5] / size) / (2.0 * t[i]);
     }
-
 
     std::ofstream fdx2out("./results/dx2.txt");
     std::ofstream fmdx2out("./results/mdx2.txt");
