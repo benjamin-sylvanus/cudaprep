@@ -172,6 +172,8 @@ double *simulation::nextPosition(double *nexts) const {
     return nexts;
 }
 
+
+
 // todo: implement a display method
 
 #pragma clang diagnostic pop

@@ -10,13 +10,11 @@
 
 class particle {
 private:
-
-
-
     bool flag = false;
     bool state = false;
     double pos[3] = {0,0,0};
     double * stepsize = nullptr;
+
 public:
     particle();
     particle(bool flag, bool state, const double *pInt,double * pStep);

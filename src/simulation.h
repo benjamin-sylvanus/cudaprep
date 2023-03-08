@@ -35,6 +35,7 @@ public:
     // Constructors
     explicit simulation(simreader reader);
 
+
     // Mutators
     void setScale(double update);
     void setVsize(double vsize);

@@ -25,8 +25,7 @@ __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long se
     curand_init(seed, idx, 0, &state[idx]);
 }
 
-__global__ void
-simulate(double *savedata, double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state, double *SimulationParams,
+__global__ void simulate(double *savedata, double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state, double *SimulationParams,
          double4 *d4swc, int *nlut, int *NewIndex, int *IndexSize, int size, int iter, bool debug) {
     int gid = threadIdx.x + blockDim.x * blockIdx.x;
 
@@ -43,7 +42,6 @@ simulate(double *savedata, double *dx2, int *Bounds, curandStatePhilox4_32_10_t 
         double4 xi;
         double3 nextpos;
         double3 xnot;
-
         int3 upper;
         int3 lower;
         int3 floorpos;
@@ -52,10 +50,8 @@ simulate(double *savedata, double *dx2, int *Bounds, curandStatePhilox4_32_10_t 
         double3 d2 = make_double3(0.0, 0.0, 0.0);
         bool completes;
         bool flag;
-
         double permprob = 0.0;
         double step = step_size;
-
 
         // init local state var
         curandStatePhilox4_32_10_t localstate = state[gid];
@@ -63,7 +59,7 @@ simulate(double *savedata, double *dx2, int *Bounds, curandStatePhilox4_32_10_t 
 
         // initialize position inside cell
         A = initPosition(gid, dx2, Bounds, state, SimulationParams, d4swc, nlut, NewIndex, IndexSize,
-                                size, iter, debug);
+                         size, iter, debug);
 
         // record initial position
         xnot = make_double3(A.x, A.y, A.z);
@@ -82,7 +78,7 @@ simulate(double *savedata, double *dx2, int *Bounds, curandStatePhilox4_32_10_t 
                 xi = curand_uniform4_double(&localstate);
 
                 // set next position
-                setNextPos(nextpos,A,xi,step);
+                setNextPos(nextpos, A, xi, step);
 
                 // floor of next position -> check voxels
                 floorpos = make_int3((int) nextpos.x, (int) nextpos.y, (int) nextpos.z);
@@ -102,19 +98,39 @@ simulate(double *savedata, double *dx2, int *Bounds, curandStatePhilox4_32_10_t 
 
                     // scuffed sub2ind function
                     int id_test = s2i(floorpos, b_int3);
+
+                    // extract lookup table value
                     int test_lutvalue = nlut[id_test];
+
+                    // child parent indicies
                     int2 vindex;
+
+                    // parent swc values
                     double4 parent;
+
+                    // child swc values
                     double4 child;
+
+                    // distance^2 from child to parent
                     double dist2;
+
+                    // for each connnction check if particle inside
                     for (int page = 0; page < i_int3.z; page++) {
+
+                        // create a subscript indices
                         int3 c_new = make_int3(test_lutvalue, 0, page);
                         int3 p_new = make_int3(test_lutvalue, 1, page);
+
+                        // convert subscripted index to linear index and get value from Index Array
                         vindex.x = NewIndex[s2i(c_new, i_int3)] - 1;
                         vindex.y = NewIndex[s2i(p_new, i_int3)] - 1;
+
                         if ((vindex.x) != -1) {
+                            //extract child parent values from swc
                             child = d4swc[vindex.x];
                             parent = d4swc[vindex.y];
+
+                            // calculate euclidean distance
                             dist2 = pow(parent.x - child.x, 2) + pow(parent.y - child.y, 2) +
                                     pow(parent.z - child.z, 2);
 
@@ -131,7 +147,7 @@ simulate(double *savedata, double *dx2, int *Bounds, curandStatePhilox4_32_10_t 
                             }
                         }
 
-                        // if the value of the index array is -1 we have checked all pairs for this particle.
+                            // if the value of the index array is -1 we have checked all pairs for this particle.
                         else {
                             // end for p loop
                             page = i_int3.z;
@@ -142,17 +158,22 @@ simulate(double *savedata, double *dx2, int *Bounds, curandStatePhilox4_32_10_t 
 
                 // determine if step executes
                 completes = xi.w < permprob;
+
+                // if the next position is inside we update the position
                 if (parstate.y) {
                     A = nextpos;
                 } else {
+                    // if the particle exits successfully update the position
                     if (completes && parstate.x) {
                         A = nextpos;
                     }
+                    // if the particle fails to exit set flag to true
                     if (!completes && parstate.x && !parstate.y) {
                         flag = true;
                     }
                 }
             } else {
+                // update flag for next step
                 flag = false;
             }
             /**
@@ -178,9 +199,11 @@ int main() {
     system("clear");
 
     cout << "---Welcome---\n";
-    cout << "1. Standard Simulation: \n";
-    cout << "2. Change Configuration: \n";
-    cout << "3. Custom Configuration: \n";
+
+    cout << "1. Standard Simulation \n";
+    cout << "2. Change Configuration \n";
+    cout << "3. Custom Configuration \n";
+    cout << "4. Help \n"
     cout << "Command List: \n";
 
     int size = 10;
@@ -256,8 +279,6 @@ int main() {
     }
     printf("Trimmed SWC[0,:] = %f \t %f \t %f \t %f \n", swc_trim[0].x, swc_trim[0].y, swc_trim[0].z, swc_trim[0].w);
     printf("Trimmed SWC[0,:] = %f \t %f \t %f \t %f \n", swc_trim[1].x, swc_trim[1].y, swc_trim[1].z, swc_trim[1].w);
-
-
     std::vector <uint64_t> lut = sim.getLut();
 
     // stride + bx * (by * y + z) + x
@@ -420,7 +441,6 @@ int main() {
     cudaFree(deviceNewIndex);
     cudaFree(deviceIndexSize);
     cudaFree(deviceAllData);
-
 
     /**
     * Write Results to file

@@ -8,13 +8,13 @@
 #include <string>
 #include "datatemplate.h"
 
-class simreader{
+class simreader {
 
 private:
 
-    std::string * genpath;
+    std::string *genpath;
 public:
-    explicit simreader(std::string * path);
+    explicit simreader(std::string *path);
 
     void setpath(std::string *pString);
 
@@ -25,26 +25,23 @@ public:
     void read(std::string str);
 
     template<class T>
-    std::vector<T> read(std::string str);
+    std::vector <T> read(std::string str);
 
 
-    std::vector<std::vector<uint64_t>> readdims();
+    std::vector <std::vector<uint64_t>> readdims();
 
     std::vector<double> readconstants();
 
 };
 
-template <class T>
-std::vector<T> simreader::read(std::string str) // NOLINT(performance-unnecessary-value-param)
+template<class T>
+std::vector <T> simreader::read(std::string str) // NOLINT(performance-unnecessary-value-param)
 {
     std::string FullPath = this->getpath().append(str);
-    // std::cout<<"File: "<<FullPath<<std::endl;
+
     datatemplate<T> Data(FullPath);
-    for(T t: Data.data)
-    {
-        // std::cout<< t<< "\t";
-    }
-    // printf("\n");
+
     return Data.data;
 }
+
 #endif //CUDAPREP_SIMREADER_H
