@@ -33,7 +33,8 @@ private:
 
 public:
     // Constructors
-    explicit simulation(simreader reader);
+    simulation(simreader reader);
+    simulation();
 
 
     // Mutators

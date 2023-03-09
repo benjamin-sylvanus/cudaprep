@@ -7,25 +7,223 @@
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
-
+#include "simulation.h"
+#include "simreader.h"
+#include <string.h>
+#include <vector>
+#include <algorithm>
+#include <map>
 using namespace std;
 
-controller::controller(simulation& sim) : sim(sim) {
-    this->view = viewer();
+
+
+
+// controller::controller(simulation& sim) : sim(sim) {
+//     this->view = viewer();
+// }
+
+// for string delimiter
+
+
+std::vector<std::string> split(std::string s, std::string delimiter) {
+    size_t pos_start = 0, pos_end, delim_len = delimiter.length();
+    std::string token;
+    std::vector<std::string> res;
+
+    while ((pos_end = s.find(delimiter, pos_start)) != std::string::npos) {
+        token = s.substr (pos_start, pos_end - pos_start);
+        pos_start = pos_end + delim_len;
+        res.push_back (token);
+    }
+
+    res.push_back (s.substr (pos_start));
+    return res;
+}
+
+controller::controller(std::string path)
+{
+  simreader reader(&path);
+  simulation sim(reader);
+  this->sim = sim;
+  this->view = viewer();
+  this->commands = {"h","c","a"};
+
+  std::map<std::string, Controls> map{
+  {"c", Controls::Commands},
+  {"h", Controls::Help},
+  {"a", Controls::Args},
+  {"ss",Controls::StepSize},
+  {"pp",Controls::PermeationProbability},
+  {"d0",Controls::IntrinsicDiffusivity},
+  {"d", Controls::Distance},
+  {"ts",Controls::TimeStep},
+  {"sc",Controls::Scale},
+  {"vs",Controls::VoxelSize}};
+
+  std::map<std::string, std::string> targets{
+  {"c", "Controls::Commands"},
+  {"h", "Controls::Help"},
+  {"a", "Controls::Args"},
+  {"ss","Controls::StepSize"},
+  {"pp","Controls::PermeationProbability"},
+  {"d0","Controls::IntrinsicDiffusivity"},
+  {"d", "Controls::Distance"},
+  {"ts","Controls::TimeStep"},
+  {"sc","Controls::Scale"},
+  {"vs","Controls::VoxelSize"}};
+
+
+  this->map = map;
+  this->targets = targets;
+
+  // {ss,pp,d0,d,ts,pd,ad,s,vs};
+
+  this->args = {"ss", "pp", "d0", "d", "ts", "pd", "ad", "s", "vs"};
+  /**
+  *
+      simreader reader;
+      std::vector<double> swc; // swc array;
+      std::vector<std::uint64_t> lut; // lut of simulation
+      std::vector<std::uint64_t> index; // index array
+      std::vector<std::uint64_t> pairs; // pairs of swc
+      std::vector<std::uint64_t> bounds; // bounds of geometry
+      double particle_num; // number of particles
+      double step_num; // number of steps to simulate
+      double init_in; // initialize particles inside?
+
+      step_size
+      perm_prob
+      D0
+      d
+      tstep
+      parameterdata
+      arraydims
+      scale
+      vsize
+  */
+}
+
+void controller::handleargument(std::string argument, std::string value)
+{
+  bool valid=false;
+
+  if (! std::count(this->args.begin(), this->args.end(), argument))
+  {
+    printf("invalid argument\n\n");
+    view.showargs(this->args);
+  }
+
+}
+
+void controller::handlecommand(std::vector<string> sub)
+{
+    bool valid=false;
+    std::string c = sub[0];
+
+    Controls input = this->map[c];
+    std::string target = this->targets[c];
+
+    switch(input)
+    {
+      case Controls::Help:
+        //call view.help();
+        printf("Help\n");
+        break;
+
+      case Controls::Args:
+        //call view.args();
+
+        printf("Args\n");
+        break;
+
+      case Controls::Commands:
+        //view.commands();
+
+        printf("Commands\n");
+        break;
+
+      case Controls::StepSize:
+        // validate additional parameters;
+        (sub.size() < 2) ? view.AlertNoParameter(target) : this->sim.setStep_size(std::stod(sub[1]));
+        break;
+
+      case Controls::PermeationProbability:
+        //validate additional parameters;
+        (sub.size() < 2) ? view.AlertNoParameter(target) : this->sim.setPerm_prob(std::stod(sub[1]));
+        break;
+
+      case Controls::IntrinsicDiffusivity:
+        //validate additional parameters;
+        (sub.size() < 2) ? view.AlertNoParameter(target) : this->sim.setD0(std::stod(sub[1]));
+        break;
+
+      case Controls::Distance:
+        //validate additional parameters;
+        (sub.size() < 2) ? view.AlertNoParameter(target) : this->sim.setD(std::stod(sub[1]));
+        break;
+
+      case Controls::TimeStep:
+        //validate additional parameters;
+        (sub.size() < 2) ? view.AlertNoParameter(target) : this->sim.setTstep(std::stod(sub[1]));
+        break;
+
+      case Controls::Scale:
+        //validate additional parameters;
+        (sub.size() < 2) ? view.AlertNoParameter(target) : this->sim.setScale(std::stod(sub[1]));
+        break;
+
+      case Controls::VoxelSize:
+        //validate additional parameters;
+        (sub.size() < 2) ? view.AlertNoParameter(target) : this->sim.setVsize(std::stod(sub[1]));
+        break;
+
+      case Controls::Invalid:
+        //validate additional parameters;
+        printf("Invalid Argument\n");
+        break;
+
+      default:
+        printf("Invalid Argument\n");
+        break;
+
+    }
+}
+
+void controller::handleinput(std::string buf)
+{
+  std::vector<std::string> elements = split(buf,"-");
+
+  for(const string& s: elements)
+  {
+      if (s.length() > 0)
+      {
+        std::vector<string> sub = split(s," ");
+        handlecommand(sub);
+      }
+  }
 }
 
 void controller::start() {
     view.welcome();
+
     while (true)
     {
-        char buf[100];
-        std::cin.getline(buf,100);
-        cin.ignore();
-        for (char c: buf)
+        string buf;
+        getline(cin,buf);
+        bool b = (buf == "q" || buf == "Q" || buf == "done");
+        if(b)
         {
-            cout << c;
+           break;
+        }else
+        {
+          handleinput(buf);
         }
-        cout<<endl;
-        break;
+
+
     }
+}
+
+simulation controller::getSim()
+{
+  return this->sim;
 }

@@ -33,8 +33,30 @@ simulation::simulation(simreader reader) {
     this->scale = this->parameterdata[7];
     this->tstep = this->parameterdata[8];
     this->vsize = this->parameterdata[9];
-
 }
+
+simulation::simulation()
+{
+  // this->swc = osim->swc;
+  // this->parameterdata = osim->parameterdata;
+  // this->index = osim->index;
+  // this->lut = osim->lut;
+  // this->pairs = osim->pairs;
+  // this->bounds = osim->bounds;
+  // this->arraydims = osim->arraydims;
+  // this->particle_num = osim->particle_num;
+  // this->step_num = osim->step_num;
+  // this->step_size = osim->step_size;
+  // this->perm_prob = osim->perm_prob;
+  // this->init_in = osim->init_in;
+  // this->D0 = osim->D0;
+  // this->d = osim->d;
+  // this->scale = osim->scale;
+  // this->tstep = osim->tstep;
+  // this->vsize = osim->vsize;
+}
+
+
 
 double simulation::getParticle_num() const { return this->particle_num; }
 

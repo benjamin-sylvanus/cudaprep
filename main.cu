@@ -1,6 +1,8 @@
 #include "./src/simreader.h"
 #include "./src/simulation.h"
 #include "./src/particle.h"
+#include "./src/controller.h"
+#include "./src/viewer.h"
 #include "./src/funcs.h"
 #include "vector"
 #include "cuda_runtime.h"
@@ -16,6 +18,7 @@
 #include <curand_kernel.h>
 #include <fstream>
 
+
 using std::cout;
 using std::cin;
 using std::endl;
@@ -25,7 +28,7 @@ __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long se
     curand_init(seed, idx, 0, &state[idx]);
 }
 
-__global__ void simulate(double *savedata, double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state, double *SimulationParams,
+__global__ void simulate(double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state, double *SimulationParams,
          double4 *d4swc, int *nlut, int *NewIndex, int *IndexSize, int size, int iter, bool debug) {
     int gid = threadIdx.x + blockDim.x * blockIdx.x;
 
@@ -78,7 +81,10 @@ __global__ void simulate(double *savedata, double *dx2, int *Bounds, curandState
                 xi = curand_uniform4_double(&localstate);
 
                 // set next position
-                setNextPos(nextpos, A, xi, step);
+                // nextpos = setNextPos(nextpos, A, xi, step);
+                nextpos.x = A.x + ((2.0 * xi.x - 1.0) * step);
+                nextpos.y = A.y + ((2.0 * xi.y - 1.0) * step);
+                nextpos.z = A.z + ((2.0 * xi.z - 1.0) * step);
 
                 // floor of next position -> check voxels
                 floorpos = make_int3((int) nextpos.x, (int) nextpos.y, (int) nextpos.z);
@@ -179,7 +185,28 @@ __global__ void simulate(double *savedata, double *dx2, int *Bounds, curandState
             /**
              * Store Results Function
              */
-            diffusionTensor(A, xnot, vsize, dx2, savedata, d2, i);
+            // diffusionTensor(A, xnot, vsize, dx2, savedata, d2, i, gid, iter, size);
+            d2.x = fabs((A.x - xnot.x) * vsize);
+            d2.y = fabs((A.y - xnot.y) * vsize);
+            d2.z = fabs((A.z - xnot.z) * vsize);
+
+            // diffusion tensor
+            atomicAdd(&dx2[6 * i + 0], d2.x * d2.x);
+            atomicAdd(&dx2[6 * i + 1], d2.x * d2.y);
+            atomicAdd(&dx2[6 * i + 2], d2.x * d2.z);
+            atomicAdd(&dx2[6 * i + 3], d2.y * d2.y);
+            atomicAdd(&dx2[6 * i + 4], d2.y * d2.z);
+            atomicAdd(&dx2[6 * i + 5], d2.z * d2.z);
+
+            // int3 dix = make_int3(iter, size, 3);
+            // int3 did[4];
+            // did[0] = make_int3(0, i, gid);
+            // did[1] = make_int3(1, i, gid);
+            // did[2] = make_int3(2, i, gid);
+            // did[3] = make_int3(s2i(did[0], dix), s2i(did[1], dix), s2i(did[2], dix));
+            // savedata[did[3].x] = A.x;
+            // savedata[did[3].y] = A.y;
+            // savedata[did[3].z] = A.z;
         }
     }
 }
@@ -195,16 +222,16 @@ void setupSimulation() {
 
 int main() {
 
-    setupSimulation();
+    // setupSimulation();
     system("clear");
 
-    cout << "---Welcome---\n";
-
-    cout << "1. Standard Simulation \n";
-    cout << "2. Change Configuration \n";
-    cout << "3. Custom Configuration \n";
-    cout << "4. Help \n"
-    cout << "Command List: \n";
+    // cout << "---Welcome---\n";
+    //
+    // cout << "1. Standard Simulation \n";
+    // cout << "2. Change Configuration \n";
+    // cout << "3. Custom Configuration \n";
+    // cout << "4. Help \n";
+    // cout << "Command List: \n";
 
     int size = 10;
     int iter = 10;
@@ -213,9 +240,15 @@ int main() {
      * Read Simulation and Initialize Object
      */
     std::string path = "./data";
-    simreader reader(&path);
-    simulation sim(reader);
+    // simreader reader(&path);
+    // simulation sim(reader);
+    // controller control(&sim);
+    controller control(path);
+    control.start();
+
     double simparam[10];
+
+    simulation sim = control.getSim();
     /**
      <li> particle_num = SimulationParams[0] </li>
      <li> step_num = SimulationParams[1] </li>
@@ -235,12 +268,12 @@ int main() {
         printf("%f\t", simulationparams[i]);
     }
     printf("\n");
-
-    cout << "Enter Number of Particles: \n";
-    cin >> size;
-    cout << "Enter Number of Steps" << '\n';
-    cin >> iter;
-    int block_size = 128;
+    // cin.ignore();
+    // cout << "Enter Number of Particles: \n";
+    // cin >> size;
+    // cout << "Enter Number of Steps" << '\n';
+    // cin >> iter;
+    int block_size = 256;
     dim3 block(block_size);
     dim3 grid((size / block.x) + 1);
 
@@ -314,7 +347,7 @@ int main() {
     int *hostNewIndex;
     int *hostIndexSize;
     double4 *hostD4Swc;
-    double *hostAllData;
+    // double *hostAllData;
 
     // Alloc Memory for Host Pointers
     hostBounds = (int *) malloc(3 * sizeof(int));
@@ -324,11 +357,11 @@ int main() {
     hostNewLut = (int *) malloc(prod * sizeof(int));
     hostNewIndex = (int *) malloc(newindexsize * sizeof(int));
     hostIndexSize = (int *) malloc(3 * sizeof(int));
-    hostAllData = (double *) malloc(3 * iter * size * sizeof(double));
+    // hostAllData = (double *) malloc(3 * iter * size * sizeof(double));
 
     // Set Values for Host
     memset(hostdx2, 0.0, 6 * iter * sizeof(double));
-    memset(hostAllData, 0.0, 3 * iter * size * sizeof(double));
+    // memset(hostAllData, 0.0, 3 * iter * size * sizeof(double));
 
     for (int i = 0; i < 3; i++) {
         int value = index_dims[i];
@@ -377,7 +410,7 @@ int main() {
     int *deviceNewLut;
     int *deviceNewIndex;
     int *deviceIndexSize;
-    double *deviceAllData;
+    // double *deviceAllData;
 
     clock_t start = clock();
     // Allocate Memory on Device
@@ -389,7 +422,7 @@ int main() {
     cudaMalloc((int **) &deviceNewLut, prod * sizeof(int));
     cudaMalloc((int **) &deviceNewIndex, newindexsize * sizeof(int));
     cudaMalloc((int **) &deviceIndexSize, 3 * sizeof(int));
-    cudaMalloc((double **) &deviceAllData, 3 * iter * size * sizeof(double));
+    // cudaMalloc((double **) &deviceAllData, 3 * iter * size * sizeof(double));
 
     // Set Values for Device
     cudaMemcpy(devicedx2, hostdx2, 6 * iter * sizeof(double), cudaMemcpyHostToDevice);
@@ -400,7 +433,7 @@ int main() {
     cudaMemcpy(deviceNewLut, hostNewLut, prod * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceNewIndex, hostNewIndex, newindexsize * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceIndexSize, hostIndexSize, 3 * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(deviceAllData, hostAllData, 3 * iter * size * sizeof(double), cudaMemcpyHostToDevice);
+    // cudaMemcpy(deviceAllData, hostAllData, 3 * iter * size * sizeof(double), cudaMemcpyHostToDevice);
 
     /**
      * Initalize Random Stream
@@ -411,7 +444,7 @@ int main() {
     /**
      * Call Kernel
     */
-    simulate<<<grid, block>>>(deviceAllData, devicedx2, deviceBounds, deviceState, deviceSimP, deviced4Swc,
+    simulate<<<grid, block>>>(devicedx2, deviceBounds, deviceState, deviceSimP, deviced4Swc,
                               deviceNewLut, deviceNewIndex,
                               deviceIndexSize, size, iter, debug);
     // Wait for results
@@ -424,7 +457,7 @@ int main() {
      * Copy Results From Device to Host
      */
     cudaMemcpy(hostdx2, devicedx2, 6 * iter * sizeof(double), cudaMemcpyDeviceToHost);
-    cudaMemcpy(hostAllData, deviceAllData, 3 * iter * size * sizeof(double), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(hostAllData, deviceAllData, 3 * iter * size * sizeof(double), cudaMemcpyDeviceToHost);
 
     end = clock();
     gpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
@@ -440,7 +473,7 @@ int main() {
     cudaFree(deviced4Swc);
     cudaFree(deviceNewIndex);
     cudaFree(deviceIndexSize);
-    cudaFree(deviceAllData);
+    // cudaFree(deviceAllData);
 
     /**
     * Write Results to file
@@ -504,6 +537,6 @@ int main() {
     free(hostD4Swc);
     free(hostNewIndex);
     free(hostIndexSize);
-    free(hostAllData);
+    // free(hostAllData);
     return 0;
 }

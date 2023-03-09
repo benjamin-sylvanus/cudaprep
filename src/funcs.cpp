@@ -155,7 +155,8 @@ __device__ double3 initPosition(int gid, double *dx2, int *Bounds, curandStatePh
     return A;
 }
 
-__device__ void diffusionTensor(double3 A, double3 xnot, double vsize, double *dx2, double * savedata, double3 d2, int i) {
+__device__ void diffusionTensor(double3 A, double3 xnot, double vsize, double *dx2, double * savedata, double3 d2, int i, int gid, int iter, int size) {
+
     d2.x = fabs((A.x - xnot.x) * vsize);
     d2.y = fabs((A.y - xnot.y) * vsize);
     d2.z = fabs((A.z - xnot.z) * vsize);
@@ -167,6 +168,7 @@ __device__ void diffusionTensor(double3 A, double3 xnot, double vsize, double *d
     atomicAdd(&dx2[6 * i + 3], d2.y * d2.y);
     atomicAdd(&dx2[6 * i + 4], d2.y * d2.z);
     atomicAdd(&dx2[6 * i + 5], d2.z * d2.z);
+    printf("dx2[6*i+0]%f \n",dx2[6+i+0]);
 
     int3 dix = make_int3(iter, size, 3);
     int3 did[4];
@@ -180,9 +182,10 @@ __device__ void diffusionTensor(double3 A, double3 xnot, double vsize, double *d
 }
 
 
-__device__ void setNextPos(double3 * nextpos, double3 A, double4 xi, double step)
+__device__ double3 setNextPos(double3 nextpos, double3 A, double4 xi, double step)
 {
-    nextpos[0].x = A.x + ((2.0 * xi.x - 1.0) * step);
-    nextpos[0].y = A.y + ((2.0 * xi.y - 1.0) * step);
-    nextpos[0].z = A.z + ((2.0 * xi.z - 1.0) * step);
+    nextpos.x = A.x + ((2.0 * xi.x - 1.0) * step);
+    nextpos.y = A.y + ((2.0 * xi.y - 1.0) * step);
+    nextpos.z = A.z + ((2.0 * xi.z - 1.0) * step);
+    return nextpos;
 }

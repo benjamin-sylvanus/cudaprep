@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <string>
 #include "simulation.h"
+#include <vector>
 
 
 #ifndef CUDAPREP_VIEW_H
@@ -23,8 +24,8 @@ public:
     viewer();
     void display(int option);
     void show();
-
-
+    void showargs(std::vector<std::string> args);
+    void AlertNoParameter(std::string target);
     void welcome();
 };
 

@@ -64,9 +64,9 @@ __device__ void
  * @param d2 particle displacement (scaled)
  * @param i step
  */
-diffusionTensor(double3 A, double3 xnot, double vsize, double *dx2, double *savedata, double3 d2, int i);
+diffusionTensor(double3 A, double3 xnot, double vsize, double *dx2, double *savedata, double3 d2, int i, int gid, int iter, int size);
 
-__device__ void
+__device__ double3
 /**
  *
  * @param nextpos next position
@@ -74,4 +74,4 @@ __device__ void
  * @param xi random unit vector (x,y,z,r)
  * @param step step size of simulation
  */
- setNextPos(double3 * nextpos,double3 A,double4 xi, double step);
+ setNextPos(double3 nextpos,double3 A,double4 xi, double step);
