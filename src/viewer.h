@@ -7,6 +7,7 @@
 #include <string>
 #include "simulation.h"
 #include <vector>
+#include <map>
 
 
 #ifndef CUDAPREP_VIEW_H
@@ -15,16 +16,19 @@
 
 class viewer {
 private:
-    std::string help;
-    std::string command;
-    std::string mods;
+    std::string help="-";
+    std::string command="-";
+    std::string mods="-";
+    std::string str="-";
 
 public:
 
     viewer();
     void display(int option);
-    void show();
-    void showargs(std::vector<std::string> args);
+    void show(simulation sim);
+    void showHelp();
+    void showCommands();
+    void showargs(std::map<std::string,std::string> args);
     void AlertNoParameter(std::string target);
     void welcome();
 };

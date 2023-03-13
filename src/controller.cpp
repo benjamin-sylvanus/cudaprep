@@ -52,25 +52,31 @@ controller::controller(std::string path)
   {"c", Controls::Commands},
   {"h", Controls::Help},
   {"a", Controls::Args},
+  {"s", Controls::Show},
   {"ss",Controls::StepSize},
   {"pp",Controls::PermeationProbability},
   {"d0",Controls::IntrinsicDiffusivity},
   {"d", Controls::Distance},
   {"ts",Controls::TimeStep},
   {"sc",Controls::Scale},
-  {"vs",Controls::VoxelSize}};
+  {"vs",Controls::VoxelSize},
+  {"ns",Controls::NStep},
+  {"np",Controls::NPar}};
 
   std::map<std::string, std::string> targets{
   {"c", "Controls::Commands"},
   {"h", "Controls::Help"},
   {"a", "Controls::Args"},
+  {"s", "Controls::Show"},
   {"ss","Controls::StepSize"},
   {"pp","Controls::PermeationProbability"},
   {"d0","Controls::IntrinsicDiffusivity"},
   {"d", "Controls::Distance"},
   {"ts","Controls::TimeStep"},
   {"sc","Controls::Scale"},
-  {"vs","Controls::VoxelSize"}};
+  {"vs","Controls::VoxelSize"},
+  {"ns","Controls::NStep"},
+  {"np","Controls::NPar"}};
 
 
   this->map = map;
@@ -78,7 +84,7 @@ controller::controller(std::string path)
 
   // {ss,pp,d0,d,ts,pd,ad,s,vs};
 
-  this->args = {"ss", "pp", "d0", "d", "ts", "pd", "ad", "s", "vs"};
+  this->args = {"ss", "pp", "d0", "d", "ts", "pd", "ad", "s", "vs", "ns","np"};
   /**
   *
       simreader reader;
@@ -109,37 +115,44 @@ void controller::handleargument(std::string argument, std::string value)
 
   if (! std::count(this->args.begin(), this->args.end(), argument))
   {
-    printf("invalid argument\n\n");
-    view.showargs(this->args);
+    // printf("invalid argument\n\n");
+    // view.showargs(this->args);
   }
 
 }
 
 void controller::handlecommand(std::vector<string> sub)
 {
-    bool valid=false;
     std::string c = sub[0];
 
+    if(this->map.count(c))
+    {
     Controls input = this->map[c];
     std::string target = this->targets[c];
 
     switch(input)
     {
       case Controls::Help:
-        //call view.help();
-        printf("Help\n");
+        view.showHelp();
         break;
 
       case Controls::Args:
-        //call view.args();
-
-        printf("Args\n");
+        this->view.showargs(this->targets);
         break;
 
       case Controls::Commands:
-        //view.commands();
+        view.showCommands();
+        break;
+      case Controls::Show:
+        view.show(this->sim);
+        break;
+        
+      case Controls::NStep:
+        (sub.size() < 2) ? view.AlertNoParameter(target) : this->sim.setStep_num(std::stod(sub[1]));
+        break;
 
-        printf("Commands\n");
+      case Controls::NPar:
+        (sub.size() < 2) ? view.AlertNoParameter(target) : this->sim.setParticle_num(std::stod(sub[1]));
         break;
 
       case Controls::StepSize:
@@ -177,16 +190,20 @@ void controller::handlecommand(std::vector<string> sub)
         (sub.size() < 2) ? view.AlertNoParameter(target) : this->sim.setVsize(std::stod(sub[1]));
         break;
 
-      case Controls::Invalid:
-        //validate additional parameters;
-        printf("Invalid Argument\n");
-        break;
 
       default:
         printf("Invalid Argument\n");
         break;
 
+
     }
+
+  }
+
+  else
+  {
+    printf("Invalid Argument");
+  }
 }
 
 void controller::handleinput(std::string buf)

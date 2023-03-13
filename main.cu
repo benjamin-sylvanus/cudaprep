@@ -29,7 +29,7 @@ __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long se
 }
 
 __global__ void simulate(double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state, double *SimulationParams,
-                         double4 *d4swc, int *nlut, int *NewIndex, int *IndexSize, int size, int iter, bool debug) {
+         double4 *d4swc, int *nlut, int *NewIndex, int *IndexSize, int size, int iter, bool debug) {
     int gid = threadIdx.x + blockDim.x * blockIdx.x;
 
     if (gid < size) {
@@ -198,15 +198,15 @@ __global__ void simulate(double *dx2, int *Bounds, curandStatePhilox4_32_10_t *s
             atomicAdd(&dx2[6 * i + 4], d2.y * d2.z);
             atomicAdd(&dx2[6 * i + 5], d2.z * d2.z);
 
-            int3 dix = make_int3(iter, size, 3);
-            int3 did[4];
-            did[0] = make_int3(0, i, gid);
-            did[1] = make_int3(1, i, gid);
-            did[2] = make_int3(2, i, gid);
-            did[3] = make_int3(s2i(did[0], dix), s2i(did[1], dix), s2i(did[2], dix));
-            savedata[did[3].x] = A.x;
-            savedata[did[3].y] = A.y;
-            savedata[did[3].z] = A.z;
+            // int3 dix = make_int3(iter, size, 3);
+            // int3 did[4];
+            // did[0] = make_int3(0, i, gid);
+            // did[1] = make_int3(1, i, gid);
+            // did[2] = make_int3(2, i, gid);
+            // did[3] = make_int3(s2i(did[0], dix), s2i(did[1], dix), s2i(did[2], dix));
+            // savedata[did[3].x] = A.x;
+            // savedata[did[3].y] = A.y;
+            // savedata[did[3].z] = A.z;
         }
     }
 }
@@ -221,27 +221,47 @@ void setupSimulation() {
 
 
 int main() {
+
+    // setupSimulation();
+    system("clear");
+
+    // cout << "---Welcome---\n";
+    //
+    // cout << "1. Standard Simulation \n";
+    // cout << "2. Change Configuration \n";
+    // cout << "3. Custom Configuration \n";
+    // cout << "4. Help \n";
+    // cout << "Command List: \n";
+
     int size = 10;
     int iter = 10;
+
     /**
      * Read Simulation and Initialize Object
      */
     std::string path = "./data";
+    // simreader reader(&path);
+    // simulation sim(reader);
+    // controller control(&sim);
     controller control(path);
     control.start();
+
     double simparam[10];
+
     simulation sim = control.getSim();
-    /** @brief
-     * <li> particle_num = SimulationParams[0] </li>
-     * <li> step_num = SimulationParams[1] </li>
-     * <li> step_size = SimulationParams[2] </li>
-     * <li> perm_prob = SimulationParams[3] </li>
-     * <li> init_in = SimulationParams[4] </li>
-     * <li> D0 = SimulationParams[5] </li>
-     * <li> d = SimulationParams[6] </li>
-     * <li> scale = SimulationParams[7] </li>
-     * <li> tstep = SimulationParams[8] </li>
-     * <li> vsize = SimulationParams[9] </li>
+    size = sim.getParticle_num();
+    iter = sim.getStep_num();
+    /**
+     <li> particle_num = SimulationParams[0] </li>
+     <li> step_num = SimulationParams[1] </li>
+     <li> step_size = SimulationParams[2] </li>
+     <li> perm_prob = SimulationParams[3] </li>
+     <li> init_in = SimulationParams[4] </li>
+     <li> D0 = SimulationParams[5] </li>
+     <li> d = SimulationParams[6] </li>
+     <li> scale = SimulationParams[7] </li>
+     <li> tstep = SimulationParams[8] </li>
+     <li> vsize = SimulationParams[9] </li>
      */
     std::vector<double> simulationparams = sim.getParameterdata();
     for (int i = 0; i < 10; i++) {
@@ -300,6 +320,7 @@ int main() {
     int id0 = 0 + (boundx) * ((boundy) * 2 + 2) + 3;
     printf("lut[%d]: %d\n", id0, lut[id0]);
     std::vector <uint64_t> indexarr = sim.getIndex();
+
     /**
      * @brief Lookup Table Summary
      * linearindex = stride + bx * (by * z + y) + x
@@ -313,6 +334,7 @@ int main() {
     std::vector <uint64_t> bounds_dims = arrdims[4];
     printf("%d \t %d \t %d\n", index_dims[0], index_dims[1], index_dims[2]);
     int newindexsize = index_dims[0] * index_dims[1] * index_dims[2];
+
     /**
      * Host Section:
      * - Create Pointers
@@ -327,7 +349,7 @@ int main() {
     int *hostNewIndex;
     int *hostIndexSize;
     double4 *hostD4Swc;
-    double *hostAllData;
+    // double *hostAllData;
 
     // Alloc Memory for Host Pointers
     hostBounds = (int *) malloc(3 * sizeof(int));
@@ -337,11 +359,11 @@ int main() {
     hostNewLut = (int *) malloc(prod * sizeof(int));
     hostNewIndex = (int *) malloc(newindexsize * sizeof(int));
     hostIndexSize = (int *) malloc(3 * sizeof(int));
-    hostAllData = (double *) malloc(3 * iter * size * sizeof(double));
+    // hostAllData = (double *) malloc(3 * iter * size * sizeof(double));
 
     // Set Values for Host
     memset(hostdx2, 0.0, 6 * iter * sizeof(double));
-    memset(hostAllData, 0.0, 3 * iter * size * sizeof(double));
+    // memset(hostAllData, 0.0, 3 * iter * size * sizeof(double));
 
     for (int i = 0; i < 3; i++) {
         int value = index_dims[i];
@@ -364,12 +386,17 @@ int main() {
         hostD4Swc[i].z = swc_trim[i].z;
         hostD4Swc[i].w = swc_trim[i].w;
     }
+
+
     for (int i = 0; i < 10; i++) {
         hostSimP[i] = simparam[i];
     }
+
     hostBounds[0] = boundx;
     hostBounds[1] = boundy;
     hostBounds[2] = boundz;
+
+
     /**
      * Device Section:
      * - Create Pointers
@@ -385,7 +412,7 @@ int main() {
     int *deviceNewLut;
     int *deviceNewIndex;
     int *deviceIndexSize;
-    double *deviceAllData;
+    // double *deviceAllData;
 
     clock_t start = clock();
     // Allocate Memory on Device
@@ -397,7 +424,7 @@ int main() {
     cudaMalloc((int **) &deviceNewLut, prod * sizeof(int));
     cudaMalloc((int **) &deviceNewIndex, newindexsize * sizeof(int));
     cudaMalloc((int **) &deviceIndexSize, 3 * sizeof(int));
-    cudaMalloc((double **) &deviceAllData, 3 * iter * size * sizeof(double));
+    // cudaMalloc((double **) &deviceAllData, 3 * iter * size * sizeof(double));
 
     // Set Values for Device
     cudaMemcpy(devicedx2, hostdx2, 6 * iter * sizeof(double), cudaMemcpyHostToDevice);
@@ -408,7 +435,7 @@ int main() {
     cudaMemcpy(deviceNewLut, hostNewLut, prod * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceNewIndex, hostNewIndex, newindexsize * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceIndexSize, hostIndexSize, 3 * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(deviceAllData, hostAllData, 3 * iter * size * sizeof(double), cudaMemcpyHostToDevice);
+    // cudaMemcpy(deviceAllData, hostAllData, 3 * iter * size * sizeof(double), cudaMemcpyHostToDevice);
 
     /**
      * Initalize Random Stream
@@ -432,11 +459,12 @@ int main() {
      * Copy Results From Device to Host
      */
     cudaMemcpy(hostdx2, devicedx2, 6 * iter * sizeof(double), cudaMemcpyDeviceToHost);
-    cudaMemcpy(hostAllData, deviceAllData, 3 * iter * size * sizeof(double), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(hostAllData, deviceAllData, 3 * iter * size * sizeof(double), cudaMemcpyDeviceToHost);
 
     end = clock();
     gpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
     printf("kernel took %f seconds\n", gpu_time_used);
+
     /**
      * Free Device Data
      */
@@ -447,7 +475,8 @@ int main() {
     cudaFree(deviced4Swc);
     cudaFree(deviceNewIndex);
     cudaFree(deviceIndexSize);
-    cudaFree(deviceAllData);
+    // cudaFree(deviceAllData);
+
     /**
     * Write Results to file
     We need to write
@@ -465,10 +494,12 @@ int main() {
         mdx_2[6 * i + 4] = (hostdx2[6 * i + 4] / size) / (2.0 * t[i]);
         mdx_2[6 * i + 5] = (hostdx2[6 * i + 5] / size) / (2.0 * t[i]);
     }
+
     std::ofstream fdx2out("./results/dx2.txt");
     std::ofstream fmdx2out("./results/mdx2.txt");
     fdx2out.precision(15);
     fmdx2out.precision(15);
+
     for (int i = 0; i < iter; i++) {
 
         for (int j = 0; j < 6; j++) {
@@ -485,6 +516,7 @@ int main() {
             }
         }
     }
+
     fdx2out.close();
     fmdx2out.close();
     int3 dataindex = make_int3(iter, size, 3);
@@ -497,6 +529,7 @@ int main() {
             // printf("particle(id: %d,step: %d): %f %f %f\n",j,i,hostAllData[dataid.x],hostAllData[dataid.y],hostAllData[dataid.z]);
         }
     }
+
     /**
      * Free Host Data
      */
@@ -506,6 +539,6 @@ int main() {
     free(hostD4Swc);
     free(hostNewIndex);
     free(hostIndexSize);
-    free(hostAllData);
+    // free(hostAllData);
     return 0;
 }

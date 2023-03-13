@@ -16,13 +16,17 @@
 enum class Controls : int { Invalid,Commands,
 Help,
 Args,
+Show,
 StepSize,
 PermeationProbability,
 IntrinsicDiffusivity,
 Distance,
 TimeStep,
 Scale,
-VoxelSize};
+VoxelSize,
+NStep,
+NPar
+};
 
 class controller {
 private:

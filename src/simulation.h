@@ -62,7 +62,7 @@ public:
     [[nodiscard]] double getParticle_num() const;
     [[nodiscard]] double getStep_num() const;
     [[nodiscard]] double getInit_in() const;
-    [[nodiscard]] double * getStep_size();
+    [[nodiscard]] double getStep_size();
     [[nodiscard]] double getPerm_prob() const;
     [[nodiscard]] double getD0() const;
     [[nodiscard]] double getD() const;

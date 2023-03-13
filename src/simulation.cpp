@@ -68,7 +68,7 @@ double simulation::getStep_num() const { return this->step_num; }
 
 double simulation::getInit_in() const { return this->init_in; }
 
-double *simulation::getStep_size() { return &this->step_size; }
+double simulation::getStep_size() { return this->step_size; }
 
 double simulation::getPerm_prob() const { return this->perm_prob; }
 
