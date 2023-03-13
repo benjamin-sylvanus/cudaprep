@@ -29,7 +29,7 @@ __device__ bool swc2v(double3 nextpos, double4 child, double4 parent, double dis
  * @param b size of array: (nrows ncols npages) -> (b.x b.y b.z)
  * @return linear index
  */
-__device__ int s2i(int3 i, int3 b);
+__device__ __host__ int s2i(int3 i, int3 b);
 
 __device__ double3
 /**

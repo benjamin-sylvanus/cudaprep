@@ -67,7 +67,7 @@ __device__ bool swc2v(double3 nextpos, double4 child, double4 parent, double dis
 }
 
 
-__device__ int s2i(int3 i, int3 b) {
+__device__ __host__ int s2i(int3 i, int3 b) {
     return 0 + b.x * (b.y * i.z + i.y) + i.x;
 }
 
