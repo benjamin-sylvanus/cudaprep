@@ -37,23 +37,7 @@ simulation::simulation(simreader reader) {
 
 simulation::simulation()
 {
-  // this->swc = osim->swc;
-  // this->parameterdata = osim->parameterdata;
-  // this->index = osim->index;
-  // this->lut = osim->lut;
-  // this->pairs = osim->pairs;
-  // this->bounds = osim->bounds;
-  // this->arraydims = osim->arraydims;
-  // this->particle_num = osim->particle_num;
-  // this->step_num = osim->step_num;
-  // this->step_size = osim->step_size;
-  // this->perm_prob = osim->perm_prob;
-  // this->init_in = osim->init_in;
-  // this->D0 = osim->D0;
-  // this->d = osim->d;
-  // this->scale = osim->scale;
-  // this->tstep = osim->tstep;
-  // this->vsize = osim->vsize;
+
 }
 
 
@@ -92,55 +76,76 @@ std::vector<double> simulation::getParameterdata() { return this->parameterdata;
 
 std::vector <std::vector<uint64_t>> simulation::getArraydims() { return this->arraydims; }
 
+/**
+ <li> particle_num = SimulationParams[0] </li>
+ <li> step_num = SimulationParams[1] </li>
+ <li> step_size = SimulationParams[2] </li>
+ <li> perm_prob = SimulationParams[3] </li>
+ <li> init_in = SimulationParams[4] </li>
+ <li> D0 = SimulationParams[5] </li>
+ <li> d = SimulationParams[6] </li>
+ <li> scale = SimulationParams[7] </li>
+ <li> tstep = SimulationParams[8] </li>
+ <li> vsize = SimulationParams[9] </li>
+ */
+ void simulation::setParticle_num(double pnum) {
+     printf("Particle Num: %.0f -> %.0f\n", this->particle_num, pnum);
+     this->particle_num = pnum;
+     this->parameterdata[0]=pnum;
+ }
+
+ void simulation::setStep_num(double snum) {
+     printf("Step Num: %.0f -> %.0f\n", this->step_num, snum);
+     this->step_num = snum;
+     this->parameterdata[1]=snum;
+ }
+
+ void simulation::setStep_size(double stepsize) {
+     printf("Step Size: %f -> %f\n", this->step_size, stepsize);
+     this->step_size = stepsize;
+     this->parameterdata[2]=stepsize;
+ }
+
+ void simulation::setPerm_prob(double permprob) {
+     printf("Permeation Probability: %f -> %f\n", this->perm_prob, permprob);
+     this->perm_prob = permprob;
+     this->parameterdata[3]=permprob;
+ }
+
+ void simulation::setInit_in(double initin) {
+     printf("Initialize Random Walker Inside: %f -> %f\n", this->init_in, initin);
+     this->init_in = initin;
+     this->parameterdata[4]=initin;
+ }
+
+ void simulation::setD0(double d0) {
+     printf("D0: %f -> %f\n", this->D0, d0);
+     this->D0 = d0;
+     this->parameterdata[5]=d0;
+ }
+
+ void simulation::setD(double d) {
+     printf("d: %f -> %f\n", this->d, d);
+     this->d = d;
+     this->parameterdata[6]=d;
+ }
+
 void simulation::setScale(double nscale) {
     printf("Scale: %f -> %f\n", this->scale, nscale);
     this->scale = nscale;
-}
-
-void simulation::setVsize(double vs) {
-    printf("Vsize: %f -> %f\n", this->vsize, vs);
-    this->vsize = vs;
-
-}
-
-void simulation::setParticle_num(double pnum) {
-    printf("Particle Num: %.0f -> %.0f\n", this->particle_num, pnum);
-    this->particle_num = pnum;
-}
-
-void simulation::setStep_num(double snum) {
-    printf("Step Num: %.0f -> %.0f\n", this->step_num, snum);
-    this->step_num = snum;
-}
-
-void simulation::setInit_in(double initin) {
-    printf("Initialize Random Walker Inside: %f -> %f\n", this->init_in, initin);
-    this->init_in = initin;
-}
-
-void simulation::setStep_size(double stepsize) {
-    printf("Step Size: %f -> %f\n", this->step_size, stepsize);
-    this->step_size = stepsize;
-}
-
-void simulation::setPerm_prob(double permprob) {
-    printf("Permeation Probability: %f -> %f\n", this->perm_prob, permprob);
-    this->perm_prob = permprob;
-}
-
-void simulation::setD0(double d0) {
-    printf("D0: %f -> %f\n", this->D0, d0);
-    this->D0 = d0;
-}
-
-void simulation::setD(double d) {
-    printf("d: %f -> %f\n", this->d, d);
-    this->d = d;
+    this->parameterdata[7]=nscale;
 }
 
 void simulation::setTstep(double timestep) {
     printf("Time Step (ms): %f -> %f\n", this->tstep, timestep);
     this->tstep = timestep;
+    this->parameterdata[8]=timestep;
+}
+
+void simulation::setVsize(double vs) {
+    printf("Vsize: %f -> %f\n", this->vsize, vs);
+    this->vsize = vs;
+    this->parameterdata[9]=vs;
 }
 
 void simulation::setSwc() {
@@ -172,9 +177,9 @@ void simulation::setArraydims() {
 }
 
 double *simulation::nextPosition(double *nexts) const {
-    auto elapsed = clock();
-    clock_t time_req;
-    time_req = clock();
+    // auto elapsed = clock();
+    // clock_t time_req;
+    // time_req = clock();
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::mt19937 generator(seed);
     std::uniform_real_distribution<double> uniform01(0.0, 1.0);

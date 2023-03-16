@@ -50,7 +50,8 @@ __device__ double3
  */
 initPosition(int gid, double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state,
                     double *SimulationParams, double4 *d4swc, int *nlut, int *NewIndex,
-                    int *IndexSize, int size, int iter, bool debug);
+                    int *IndexSize, int size, int iter,int init_in, bool debug);
+                    
 
 
 __device__ void

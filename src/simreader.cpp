@@ -46,7 +46,6 @@ std::vector<std::vector<std::uint64_t>> simreader::readdims()
             while ((pos = tp.find(delimiter)) != std::string::npos)
             {
                 token = tp.substr(0, pos);
-                // std::cout << token << std::endl;
                 temp.push_back(std::stoi(token));
                 tp.erase(0, pos + delimiter.length());
             }

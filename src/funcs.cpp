@@ -20,7 +20,7 @@ __device__ bool swc2v(double3 nextpos, double4 child, double4 parent, double dis
     * <li> r = ( c + r2 ) / (sqrt ( 1 - ( |r1-r2 | / l ) ) </li>
     * <li>c = ( |r1 - r2| * l ) / L </li>
    */
-    bool pos1;
+    // bool pos1;
     bool pos;
 
     if (dist == 0) {
@@ -34,35 +34,71 @@ __device__ bool swc2v(double3 nextpos, double4 child, double4 parent, double dis
     double z = child.z + (parent.z - child.z) * t;
     double cr2 = pow(child.w, 2);
     double pr2 = pow(parent.w, 2);
-    double rd = fabs(child.w - parent.w);
 
-    bool list1;
-    if (dist < cr2) {
-        list1 = false;
-    } else {
-        list1 = (x - child.x) * (x - parent.x) + (y - child.y) * (y - parent.y) + (z - child.z) * (z - parent.z) < 0.0;
+    /**
+    L = sqrt((x2 - x1) ^ 2 + (y2 - y1) ^ 2 + (z2 - z1) ^ 2);
+    sin_theta = abs(r1-r2)/L;
+    cos_theta = sqrt(1-sin_theta^2);
+    list1 = (t > (r1*sin_theta/L)) .* (t < (1+r2*sin_theta/L));
+    list1 = logical(list1);
+    m = (r2-r1)*cos_theta/(L+(r2-r1)*sin_theta);
+    % distance btw x and x1
+    rx = L*t;
+    % distance btw tangent surface to the line x1-x2 at rx
+    ry = m*rx + (cos_theta - m*sin_theta) * r1;
+    pos1 = dist2 < (ry .^ 2); % smaller in one line and less than and equal
+    pos = pos1;
+    */
+
+    double L = sqrt(pow(parent.x-child.x,2) + pow(parent.y-child.y,2) + pow(parent.z-child.z,2));
+
+    double sin_theta = fabs(child.w - parent.w)/L;
+
+    double cos_theta = sqrt(1-pow(sin_theta,2));
+    // printf("(t > ( (child.w * sin_theta) / L)): %d,\tt < (1 + (parent.w * sin_theta): %d\n",(t > (child.w * sin_theta) / L),(t < (1 + (parent.w * sin_theta)/L)));
+    bool list1 = (t > ( (child.w * sin_theta) / L)) && (t < (1 + (parent.w * sin_theta) / L));
+    // printf("List1: %d\n",list1);
+
+    if (list1)
+    {
+      double dist2 = (pow(nextpos.x - x, 2) + pow(nextpos.y - y, 2) + pow(nextpos.z - z, 2));
+      double m = (parent.w-child.w) * cos_theta/(L+(parent.w-child.w)*sin_theta);
+      double rx = L * t;
+      double ry = m * rx + (cos_theta - m * sin_theta) * child.w;
+      pos = dist2 < pow(ry,2);
+    }
+    else
+    {
+      pos = (pow(nextpos.x - child.x, 2) + pow(nextpos.y - child.y, 2) + pow(nextpos.z - child.z, 2)) < cr2 ||
+             (pow(nextpos.x - parent.x, 2) + pow(nextpos.y - parent.y, 2) + pow(nextpos.z - parent.z, 2)) < pr2;
     }
 
-    if (list1) {
-        double dist2 = (pow(nextpos.x - x, 2) + pow(nextpos.y - y, 2) + pow(nextpos.z - z, 2));
-
-        // distance from orthogonal vector to p2
-        double l = sqrt(pow(x - parent.x, 2) + pow(y - parent.y, 2) + pow(z - parent.z, 2));
-
-        // distance from p1 -> p2
-        double L = sqrt(dist);
-
-        double c = (rd * l) / L;
-        double r = (c + parent.w) / sqrt(1 - ((rd / L) * (rd / L)));
-        pos1 = dist2 < (pow(r, 2));
-        pos = pos1;
-    } else {
-        double lower = (pow(nextpos.x - child.x, 2) + pow(nextpos.y - child.y, 2) + pow(nextpos.z - child.z, 2));
-        double higher = (pow(nextpos.x - parent.x, 2) + pow(nextpos.y - parent.y, 2) + pow(nextpos.z - parent.z, 2));
-        pos1 = (pow(nextpos.x - child.x, 2) + pow(nextpos.y - child.y, 2) + pow(nextpos.z - child.z, 2)) < cr2 ||
-               (pow(nextpos.x - parent.x, 2) + pow(nextpos.y - parent.y, 2) + pow(nextpos.z - parent.z, 2)) < pr2;
-        pos = pos1;
-    }
+    // double rd = fabs(child.w - parent.w);
+    // if (dist < cr2) {
+    //     list1 = false;
+    // } else {
+    //     list1 = (x - child.x) * (x - parent.x) + (y - child.y) * (y - parent.y) + (z - child.z) * (z - parent.z) < 0.0;
+    // }
+    // if (list1) {
+    //     double dist2 = (pow(nextpos.x - x, 2) + pow(nextpos.y - y, 2) + pow(nextpos.z - z, 2));
+    //
+    //     // distance from orthogonal vector to p2
+    //     double l = sqrt(pow(x - parent.x, 2) + pow(y - parent.y, 2) + pow(z - parent.z, 2));
+    //
+    //     // distance from p1 -> p2
+    //     double L = sqrt(dist);
+    //
+    //     double c = (rd * l) / L;
+    //     double r = (c + parent.w) / sqrt(1 - ((rd / L) * (rd / L)));
+    //     pos1 = dist2 < (pow(r, 2));
+    //     pos = pos1;
+    // } else {
+    //     double lower = (pow(nextpos.x - child.x, 2) + pow(nextpos.y - child.y, 2) + pow(nextpos.z - child.z, 2));
+    //     double higher = (pow(nextpos.x - parent.x, 2) + pow(nextpos.y - parent.y, 2) + pow(nextpos.z - parent.z, 2));
+    //     pos1 = (pow(nextpos.x - child.x, 2) + pow(nextpos.y - child.y, 2) + pow(nextpos.z - child.z, 2)) < cr2 ||
+    //            (pow(nextpos.x - parent.x, 2) + pow(nextpos.y - parent.y, 2) + pow(nextpos.z - parent.z, 2)) < pr2;
+    //     pos = pos1;
+    // }
     return pos;
 }
 
@@ -73,7 +109,7 @@ __device__ __host__ int s2i(int3 i, int3 b) {
 
 __device__ double3 initPosition(int gid, double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state,
                     double *SimulationParams, double4 *d4swc, int *nlut, int *NewIndex,
-                    int *IndexSize, int size, int iter, bool debug) {
+                    int *IndexSize, int size, int iter, int init_in, bool debug) {
 
     double3 nextpos;
     int3 upper;
@@ -104,18 +140,17 @@ __device__ double3 initPosition(int gid, double *dx2, int *Bounds, curandStatePh
         floorpos.z = (int) A.z;
 
         // upper bounds of lookup table
-        upper.x = floorpos.x < (Bounds[0] - 0);
-        upper.y = floorpos.y < (Bounds[1] - 0);
-        upper.z = floorpos.z < (Bounds[2] - 0);
+        upper.x = floorpos.x < b_int3.x;
+        upper.y = floorpos.y < b_int3.y;
+        upper.z = floorpos.z < b_int3.z;
 
         // lower bounds of lookup table
-        lower.x = floorpos.x >= 0;
-        lower.y = floorpos.y >= 0;
-        lower.z = floorpos.z >= 0;
+        lower.x = floorpos.x > 0;
+        lower.y = floorpos.y > 0;
+        lower.z = floorpos.z > 0;
 
         // position inside the bounds of volume -> state of next position true : false
         parstate.x = (lower.x && lower.y && lower.z && upper.x && upper.y && upper.z) ? 1 : 0;
-
         double4 parent;
         double4 child;
         int2 vindex;
@@ -168,7 +203,6 @@ __device__ void diffusionTensor(double3 A, double3 xnot, double vsize, double *d
     atomicAdd(&dx2[6 * i + 3], d2.y * d2.y);
     atomicAdd(&dx2[6 * i + 4], d2.y * d2.z);
     atomicAdd(&dx2[6 * i + 5], d2.z * d2.z);
-    printf("dx2[6*i+0]%f \n",dx2[6+i+0]);
 
     int3 dix = make_int3(iter, size, 3);
     int3 did[4];

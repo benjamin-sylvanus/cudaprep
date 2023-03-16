@@ -33,15 +33,16 @@ __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long se
     int idx = threadIdx.x + blockDim.x * blockIdx.x;
     curand_init(seed, idx, 0, &state[idx]);
 }
-
-__global__ void simulate(double * savedata,double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state, double *SimulationParams,
+// __global__ void simulate(double * savedata,double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state, double *SimulationParams,
+//          double4 *d4swc, int *nlut, int *NewIndex, int *IndexSize, int size, int iter, bool debug)
+__global__ void simulate(double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state, double *SimulationParams,
          double4 *d4swc, int *nlut, int *NewIndex, int *IndexSize, int size, int iter, bool debug) {
     int gid = threadIdx.x + blockDim.x * blockIdx.x;
 
     if (gid < size) {
         double step_size = SimulationParams[2];
         double perm_prob = SimulationParams[3];
-        double init_in = SimulationParams[4];
+        int init_in = (int) SimulationParams[4];
         double vsize = SimulationParams[9];
         double3 A;
         int2 parstate;
@@ -59,7 +60,7 @@ __global__ void simulate(double * savedata,double *dx2, int *Bounds, curandState
         double3 d2 = make_double3(0.0, 0.0, 0.0);
         bool completes;
         bool flag;
-        double permprob = 0.0;
+
         double step = step_size;
 
         // init local state var
@@ -68,7 +69,7 @@ __global__ void simulate(double * savedata,double *dx2, int *Bounds, curandState
 
         // initialize position inside cell
         A = initPosition(gid, dx2, Bounds, state, SimulationParams, d4swc, nlut, NewIndex, IndexSize,
-                         size, iter, debug);
+                         size, iter,init_in, debug);
 
         // record initial position
         xnot = make_double3(A.x, A.y, A.z);
@@ -81,6 +82,8 @@ __global__ void simulate(double * savedata,double *dx2, int *Bounds, curandState
 
         // iterate over steps
         for (int i = 0; i < iter; i++) {
+
+          // printf("i: %d\tgid: %d\n",i,gid);
 
             if (flag == 0) {
                 // generate uniform randoms for step
@@ -96,7 +99,7 @@ __global__ void simulate(double * savedata,double *dx2, int *Bounds, curandState
                 floorpos = make_int3((int) nextpos.x, (int) nextpos.y, (int) nextpos.z);
 
                 // upper bounds of lookup table
-                upper = make_int3(floorpos.x < b_int3.x, floorpos.y < b_int3.y, floorpos.x < b_int3.z);
+                upper = make_int3(floorpos.x < b_int3.x, floorpos.y < b_int3.y, floorpos.z < b_int3.z);
 
                 // lower bounds of lookup table
                 lower = make_int3(floorpos.x >= 0, floorpos.y >= 0, floorpos.z >= 0);
@@ -126,8 +129,9 @@ __global__ void simulate(double * savedata,double *dx2, int *Bounds, curandState
                     // distance^2 from child to parent
                     double dist2;
 
-                    // for each connnction check if particle inside
+                    // for each connection check if particle inside
                     for (int page = 0; page < i_int3.z; page++) {
+                        // printf("I: %d\tGID: %d\tPage: %d\n", i,gid,page);
 
                         // create a subscript indices
                         int3 c_new = make_int3(test_lutvalue, 0, page);
@@ -143,8 +147,7 @@ __global__ void simulate(double * savedata,double *dx2, int *Bounds, curandState
                             parent = d4swc[vindex.y];
 
                             // calculate euclidean distance
-                            dist2 = pow(parent.x - child.x, 2) + pow(parent.y - child.y, 2) +
-                                    pow(parent.z - child.z, 2);
+                            dist2 = pow(parent.x - child.x, 2) + pow(parent.y - child.y, 2) + pow(parent.z - child.z, 2);
 
                             // determine whether particle is inside this connection
                             bool inside = swc2v(nextpos, child, parent, dist2);
@@ -163,13 +166,13 @@ __global__ void simulate(double * savedata,double *dx2, int *Bounds, curandState
                         else {
                             // end for p loop
                             page = i_int3.z;
-                            parstate.y = 1;
+                            parstate.y = 0;
                         }
                     }
                 }
 
                 // determine if step executes
-                completes = xi.w < permprob;
+                completes = xi.w < perm_prob;
 
                 // if the next position is inside we update the position
                 if (parstate.y) {
@@ -204,19 +207,17 @@ __global__ void simulate(double * savedata,double *dx2, int *Bounds, curandState
             atomicAdd(&dx2[6 * i + 4], d2.y * d2.z);
             atomicAdd(&dx2[6 * i + 5], d2.z * d2.z);
 
-            int3 dix = make_int3(iter, size,3);
+            // int3 dix = make_int3(size, iter,3);
 
-            int3 did[4];
-            did[0] = make_int3(gid,i,0);
-            did[1] = make_int3(gid,i,1);
-            did[2] = make_int3(gid,i,2);
-            did[3] = make_int3(s2i(did[0],dix),s2i(did[1],dix),s2i(did[2],dix));
-            // printf("subscripts: \n0: [%d %d %d] \n1: [%d %d %d] \n2: [%d %d %d]\nId:\n3[%d %d %d]\n\n",
-            // did[0].x, did[0].y, did[0].z, did[1].x, did[1].y, did[1].z, did[2].x, did[2].y, did[2].z, did[3].x, did[3].y ,did[3].z);
+            // int3 did[4];
+            // did[0] = make_int3(gid,i,0);
+            // did[1] = make_int3(gid,i,1);
+            // did[2] = make_int3(gid,i,2);
+            // did[3] = make_int3(s2i(did[0],dix),s2i(did[1],dix),s2i(did[2],dix));
 
-            savedata[did[3].x] = A.x;
-            savedata[did[3].y] = A.y;
-            savedata[did[3].z] = A.z;
+            // savedata[did[3].x] = A.x;
+            // savedata[did[3].y] = A.y;
+            // savedata[did[3].z] = A.z;
         }
     }
 }
@@ -234,13 +235,8 @@ int main() {
     cudaEvent_t start_c, stop_c;
     cudaEventCreate(&start_c);
     cudaEventCreate(&stop_c);
-
-
     float milliseconds = 0;
     system("clear");
-
-
-
     int size = 10;
     int iter = 10;
 
@@ -274,13 +270,13 @@ int main() {
     for (int i = 0; i < 10; i++) {
         double value = simulationparams[i];
         simparam[i] = value;
-        // printf("%f\t", simulationparams[i]);
     }
-    // printf("\n");
 
-    int block_size = 256;
+    int block_size = 128;
     dim3 block(block_size);
     dim3 grid((size / block.x) + 1);
+
+
 
     // todo: figure out why different bound size gives bug
     std::vector <uint64_t> bounds = sim.getbounds();
@@ -292,7 +288,6 @@ int main() {
 
     std::vector<double> r_swc = sim.getSwc();
     int nrow = r_swc.size() / 6;
-    // printf("NRows: %d\n", r_swc.size() / 6);
     /**
      * @brief Indexing SWC ARRAY
      * index + (dx*0:5);
@@ -322,12 +317,10 @@ int main() {
       w_swc[4*i + 2] = r_swc[i + nrow*3];
       w_swc[4*i + 3] = r_swc[i + nrow*4];
     }
-    // printf("Trimmed SWC[0,:] = %f \t %f \t %f \t %f \n", swc_trim[0].x, swc_trim[0].y, swc_trim[0].z, swc_trim[0].w);
-    // printf("Trimmed SWC[0,:] = %f \t %f \t %f \t %f \n", swc_trim[1].x, swc_trim[1].y, swc_trim[1].z, swc_trim[1].w);
     std::vector <uint64_t> lut = sim.getLut();
 
     // stride + bx * (by * y + z) + x
-    int id0 = 0 + (boundx) * ((boundy) * 2 + 2) + 3;
+    // int id0 = 0 + (boundx) * ((boundy) * 2 + 2) + 3;
     // printf("lut[%d]: %d\n", id0, lut[id0]);
     std::vector <uint64_t> indexarr = sim.getIndex();
 
@@ -360,7 +353,7 @@ int main() {
     int *hostNewIndex;
     int *hostIndexSize;
     double4 *hostD4Swc;
-    double *hostAllData;
+    // double *hostAllData;
 
     // Alloc Memory for Host Pointers
     hostBounds = (int *) malloc(3 * sizeof(int));
@@ -370,11 +363,18 @@ int main() {
     hostNewLut = (int *) malloc(prod * sizeof(int));
     hostNewIndex = (int *) malloc(newindexsize * sizeof(int));
     hostIndexSize = (int *) malloc(3 * sizeof(int));
-    hostAllData = (double *) malloc(3 * iter * size * sizeof(double));
+    // hostAllData = (double *) malloc(3 * iter * size * sizeof(double));
 
     // Set Values for Host
     memset(hostdx2, 0.0, 6 * iter * sizeof(double));
-    memset(hostAllData, 0.0, 3 * iter * size * sizeof(double));
+    // memset(hostAllData, 0.0, 3 * iter * size * sizeof(double));
+
+
+    // for (int i = 0; i<3*iter*size; i++)
+    //
+    // {
+      // hostAllData[i] = (double) i;
+    // }
 
     for (int i = 0; i < 3; i++) {
         int value = index_dims[i];
@@ -397,7 +397,6 @@ int main() {
         hostD4Swc[i].z = swc_trim[i].z;
         hostD4Swc[i].w = swc_trim[i].w;
     }
-
 
     for (int i = 0; i < 10; i++) {
         hostSimP[i] = simparam[i];
@@ -424,7 +423,7 @@ int main() {
     int *deviceNewLut;
     int *deviceNewIndex;
     int *deviceIndexSize;
-    double *deviceAllData;
+    // double *deviceAllData;
 
     clock_t start = clock();
     cudaEventRecord(start_c);
@@ -437,7 +436,7 @@ int main() {
     cudaMalloc((int **) &deviceNewLut, prod * sizeof(int));
     cudaMalloc((int **) &deviceNewIndex, newindexsize * sizeof(int));
     cudaMalloc((int **) &deviceIndexSize, 3 * sizeof(int));
-    cudaMalloc((double **) &deviceAllData, 3 * iter * size * sizeof(double));
+    // cudaMalloc((double **) &deviceAllData, 3 * iter * size * sizeof(double));
 
     // Set Values for Device
     printf("Copying Host data to Device\n");
@@ -449,7 +448,7 @@ int main() {
     cudaMemcpy(deviceNewLut, hostNewLut, prod * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceNewIndex, hostNewIndex, newindexsize * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceIndexSize, hostIndexSize, 3 * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(deviceAllData, hostAllData, 3 * iter * size * sizeof(double), cudaMemcpyHostToDevice);
+    // cudaMemcpy(deviceAllData, hostAllData, 3 * iter * size * sizeof(double), cudaMemcpyHostToDevice);
 
     /**
      * Initalize Random Stream
@@ -461,7 +460,10 @@ int main() {
      * Call Kernel
     */
     printf("Simulating...\n");
-    simulate<<<grid, block>>>(deviceAllData,devicedx2, deviceBounds, deviceState, deviceSimP, deviced4Swc,
+    // simulate<<<grid, block>>>(deviceAllData,devicedx2, deviceBounds, deviceState, deviceSimP, deviced4Swc,
+    //                           deviceNewLut, deviceNewIndex,
+    //                           deviceIndexSize, size, iter, debug);
+    simulate<<<grid, block>>>(devicedx2, deviceBounds, deviceState, deviceSimP, deviced4Swc,
                               deviceNewLut, deviceNewIndex,
                               deviceIndexSize, size, iter, debug);
     cudaEventRecord(stop_c);
@@ -471,19 +473,17 @@ int main() {
     clock_t end = clock();
     double gpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
     printf("Simulation took %f seconds\n", gpu_time_used);
-    printf("Cuda Timer: %f\n",milliseconds/1e3);
+
     /**
      * Copy Results From Device to Host
      */
     printf("Copying back to Host\n");
     cudaMemcpy(hostdx2, devicedx2, 6 * iter * sizeof(double), cudaMemcpyDeviceToHost);
-    cudaMemcpy(hostAllData, deviceAllData, 3 * iter * size * sizeof(double), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(hostAllData, deviceAllData, 3 * iter * size * sizeof(double), cudaMemcpyDeviceToHost);
     cudaEventSynchronize(stop_c);
     cudaEventElapsedTime(&milliseconds, start_c, stop_c);
     end = clock();
-    gpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("kernel took %f seconds\n", gpu_time_used);
-    printf("Cuda Timer: %f\n",milliseconds/1e3);
+    printf("kernel took %f seconds\n", milliseconds/1e3);
     /**
      * Free Device Data
      */
@@ -496,7 +496,7 @@ int main() {
     cudaFree(deviced4Swc);
     cudaFree(deviceNewIndex);
     cudaFree(deviceIndexSize);
-    cudaFree(deviceAllData);
+    // cudaFree(deviceAllData);
     auto t2 = high_resolution_clock::now();
     duration<double, std::milli> ms_double = t2 - t1;
     printf("%f seconds\n", ms_double.count()/1e3);
@@ -542,13 +542,18 @@ int main() {
         }
     }
 
+    // FILE * outFile = fopen("./results/filename.bin", "wb");
+    // fwrite (hostAllData,sizeof(double),iter*size*3,outFile);
+    // fclose (outFile);
 
-    FILE * outFile = fopen("./results/filename.bin", "wb");
-    fwrite (hostAllData,sizeof(double),iter*size*3,outFile);
-    fclose (outFile);
-    outFile = fopen("./results/swc.bin","wb");
+    FILE * outFile = fopen("./results/swc.bin","wb");
     fwrite (w_swc,sizeof(double),8,outFile);
     fclose(outFile);
+
+    outFile = fopen("./results/outcfg.bin","wb");
+    fwrite (hostSimP,sizeof(double),10,outFile);
+    fclose(outFile);
+
     t2 = high_resolution_clock::now();
     ms_double = t2 - t1;
     printf("%f seconds\n", ms_double.count()/1e3);
@@ -564,6 +569,6 @@ int main() {
     free(hostD4Swc);
     free(hostNewIndex);
     free(hostIndexSize);
-    free(hostAllData);
+    // free(hostAllData);
     return 0;
 }

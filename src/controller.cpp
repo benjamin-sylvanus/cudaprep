@@ -109,17 +109,6 @@ controller::controller(std::string path)
   */
 }
 
-void controller::handleargument(std::string argument, std::string value)
-{
-  bool valid=false;
-
-  if (! std::count(this->args.begin(), this->args.end(), argument))
-  {
-    // printf("invalid argument\n\n");
-    // view.showargs(this->args);
-  }
-
-}
 
 void controller::handlecommand(std::vector<string> sub)
 {
@@ -146,7 +135,7 @@ void controller::handlecommand(std::vector<string> sub)
       case Controls::Show:
         view.show(this->sim);
         break;
-        
+
       case Controls::NStep:
         (sub.size() < 2) ? view.AlertNoParameter(target) : this->sim.setStep_num(std::stod(sub[1]));
         break;
@@ -190,14 +179,10 @@ void controller::handlecommand(std::vector<string> sub)
         (sub.size() < 2) ? view.AlertNoParameter(target) : this->sim.setVsize(std::stod(sub[1]));
         break;
 
-
       default:
         printf("Invalid Argument\n");
         break;
-
-
     }
-
   }
 
   else
@@ -222,7 +207,6 @@ void controller::handleinput(std::string buf)
 
 void controller::start() {
     view.welcome();
-
     while (true)
     {
         string buf;
@@ -231,12 +215,11 @@ void controller::start() {
         if(b)
         {
            break;
-        }else
+        }
+        else
         {
           handleinput(buf);
         }
-
-
     }
 }
 

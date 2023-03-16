@@ -45,7 +45,6 @@ public:
     void start();
     void handleinput(std::string input);
     void handlecommand(std::vector<std::string>  command);
-    void handleargument(std::string a, std::string value);
     simulation getSim();
 
 };

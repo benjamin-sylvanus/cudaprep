@@ -95,7 +95,6 @@ void viewer::show(simulation sim) {
   // std::vector<double> simulation::getParameterdata()
   //
   // std::vector <std::vector<uint64_t>> simulation::getArraydims()
-
 }
 
 void viewer::welcome() {
@@ -111,7 +110,6 @@ void viewer::welcome() {
 
 viewer::viewer()
 {
-    system("clear");
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
     this->command = "-h help\n-c commands\n-s show configuration\n-d <arg> show argument\n-<arg> <value> set argument to value\n-args show arguments";
     this->str.assign(w.ws_col,'-');
