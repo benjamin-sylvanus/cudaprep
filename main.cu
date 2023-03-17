@@ -90,7 +90,6 @@ __global__ void simulate(double *dx2, int *Bounds, curandStatePhilox4_32_10_t *s
                 xi = curand_uniform4_double(&localstate);
 
                 // set next position
-                // nextpos = setNextPos(nextpos, A, xi, step);
                 nextpos.x = A.x + ((2.0 * xi.x - 1.0) * step);
                 nextpos.y = A.y + ((2.0 * xi.y - 1.0) * step);
                 nextpos.z = A.z + ((2.0 * xi.z - 1.0) * step);
@@ -199,13 +198,30 @@ __global__ void simulate(double *dx2, int *Bounds, curandStatePhilox4_32_10_t *s
             d2.y = fabs((A.y - xnot.y) * vsize);
             d2.z = fabs((A.z - xnot.z) * vsize);
 
-            // diffusion tensor
+            // Diffusion Tensor
             atomicAdd(&dx2[6 * i + 0], d2.x * d2.x);
             atomicAdd(&dx2[6 * i + 1], d2.x * d2.y);
             atomicAdd(&dx2[6 * i + 2], d2.x * d2.z);
             atomicAdd(&dx2[6 * i + 3], d2.y * d2.y);
             atomicAdd(&dx2[6 * i + 4], d2.y * d2.z);
             atomicAdd(&dx2[6 * i + 5], d2.z * d2.z);
+
+            // Kurtosis
+            atomAdd(&dx4[15* i +0],d2.x * d2.x * d2.x * d2.x);
+            atomAdd(&dx4[15* i +1],d2.x * d2.x * d2.x * d2.y);
+            atomAdd(&dx4[15* i +2],d2.x * d2.x * d2.x * d2.z);
+            atomAdd(&dx4[15* i +3],d2.x * d2.x * d2.y * d2.y);
+            atomAdd(&dx4[15* i +4],d2.x * d2.x * d2.y * d2.z);
+            atomAdd(&dx4[15* i +5],d2.x * d2.x * d2.z * d2.z);
+            atomAdd(&dx4[15* i +6],d2.x * d2.y * d2.y * d2.y);
+            atomAdd(&dx4[15* i +7],d2.x * d2.y * d2.y * d2.z);
+            atomAdd(&dx4[15* i +8],d2.x * d2.y * d2.z * d2.z);
+            atomAdd(&dx4[15* i +9],d2.x * d2.z * d2.z * d2.z);
+            atomAdd(&dx4[15* i +10],d2. y *d2. y *d2. y *d2.y);
+            atomAdd(&dx4[15* i +11],d2. y *d2. y *d2. y *d2.z);
+            atomAdd(&dx4[15* i +12],d2. y *d2. y *d2. z *d2.z);
+            atomAdd(&dx4[15* i +13],d2. y *d2. z *d2. z *d2.z);
+            atomAdd(&dx4[15* i +14],d2. z *d2. z *d2. z *d2.z);
 
             // int3 dix = make_int3(size, iter,3);
 
@@ -275,8 +291,6 @@ int main() {
     int block_size = 128;
     dim3 block(block_size);
     dim3 grid((size / block.x) + 1);
-
-
 
     // todo: figure out why different bound size gives bug
     std::vector <uint64_t> bounds = sim.getbounds();
@@ -348,6 +362,7 @@ int main() {
     printf("Creating Host Data\n");
     int *hostBounds;
     double *hostdx2;
+    double *hostdx4;
     double *hostSimP;
     int *hostNewLut;
     int *hostNewIndex;
@@ -358,6 +373,7 @@ int main() {
     // Alloc Memory for Host Pointers
     hostBounds = (int *) malloc(3 * sizeof(int));
     hostdx2 = (double *) malloc(6 * iter * sizeof(double));
+    hostdx4 = (double *) malloc(15 * iter * sizeof(double));
     hostSimP = (double *) malloc(10 * sizeof(double));
     hostD4Swc = (double4 *) malloc(nrow * sizeof(double4));
     hostNewLut = (int *) malloc(prod * sizeof(int));
@@ -367,6 +383,7 @@ int main() {
 
     // Set Values for Host
     memset(hostdx2, 0.0, 6 * iter * sizeof(double));
+    memset(hostdx4, 0.0, 15 * iter * sizeof(double));
     // memset(hostAllData, 0.0, 3 * iter * size * sizeof(double));
 
 
@@ -406,7 +423,6 @@ int main() {
     hostBounds[1] = boundy;
     hostBounds[2] = boundz;
 
-
     /**
      * Device Section:
      * - Create Pointers
@@ -417,6 +433,7 @@ int main() {
     printf("Creating Device Data.\n");
     curandStatePhilox4_32_10_t *deviceState;
     double *devicedx2;
+    double *devicedx4;
     int *deviceBounds;
     double *deviceSimP;
     double4 *deviced4Swc;
@@ -429,6 +446,7 @@ int main() {
     cudaEventRecord(start_c);
     // Allocate Memory on Device
     cudaMalloc((double **) &devicedx2, 6 * iter * sizeof(double));
+    cudaMalloc((double **) &devicedx4, 15 * iter * sizeof(double));
     cudaMalloc((int **) &deviceBounds, 3 * sizeof(int));
     cudaMalloc((curandStatePhilox4_32_10_t * *) & deviceState, size * sizeof(curandStatePhilox4_32_10_t));
     cudaMalloc((double **) &deviceSimP, 10 * sizeof(double));
@@ -441,6 +459,7 @@ int main() {
     // Set Values for Device
     printf("Copying Host data to Device\n");
     cudaMemcpy(devicedx2, hostdx2, 6 * iter * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(devicedx4, hostdx4, 15 * iter * sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(deviceBounds, hostBounds, 3 * sizeof(int), cudaMemcpyHostToDevice);
     setup_kernel<<<grid, block>>>(deviceState, 1);
     cudaMemcpy(deviceSimP, hostSimP, 10 * sizeof(double), cudaMemcpyHostToDevice);
@@ -463,7 +482,7 @@ int main() {
     // simulate<<<grid, block>>>(deviceAllData,devicedx2, deviceBounds, deviceState, deviceSimP, deviced4Swc,
     //                           deviceNewLut, deviceNewIndex,
     //                           deviceIndexSize, size, iter, debug);
-    simulate<<<grid, block>>>(devicedx2, deviceBounds, deviceState, deviceSimP, deviced4Swc,
+    simulate<<<grid, block>>>(devicedx2, devicedx4, deviceBounds, deviceState, deviceSimP, deviced4Swc,
                               deviceNewLut, deviceNewIndex,
                               deviceIndexSize, size, iter, debug);
     cudaEventRecord(stop_c);
@@ -479,6 +498,7 @@ int main() {
      */
     printf("Copying back to Host\n");
     cudaMemcpy(hostdx2, devicedx2, 6 * iter * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(hostdx4, devicedx4, 15 * iter * sizeof(double), cudaMemcpyDeviceToHost);
     // cudaMemcpy(hostAllData, deviceAllData, 3 * iter * size * sizeof(double), cudaMemcpyDeviceToHost);
     cudaEventSynchronize(stop_c);
     cudaEventElapsedTime(&milliseconds, start_c, stop_c);
@@ -492,6 +512,7 @@ int main() {
     cudaFree(deviceBounds);
     cudaFree(deviceState);
     cudaFree(devicedx2);
+    cudaFree(devicedx4);
     cudaFree(deviceSimP);
     cudaFree(deviced4Swc);
     cudaFree(deviceNewIndex);
@@ -565,6 +586,7 @@ int main() {
      */
     free(hostBounds);
     free(hostdx2);
+    free(hostdx4);
     free(hostSimP);
     free(hostD4Swc);
     free(hostNewIndex);

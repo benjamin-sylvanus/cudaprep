@@ -1,9 +1,6 @@
 # To do
 
-!!!!!!! Update github
-
 View Commands::Help
-Implement init_in
 
 Create multiple initialization functions for different particle states
 1. Inside.
