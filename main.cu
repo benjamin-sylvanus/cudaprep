@@ -207,21 +207,21 @@ __global__ void simulate(double *dx2, double *dx4, int *Bounds, curandStatePhilo
             atomicAdd(&dx2[6 * i + 5], d2.z * d2.z);
 
             // Kurtosis Tensor
-            atomAdd(&dx4[15* i +0],d2.x * d2.x * d2.x * d2.x);
-            atomAdd(&dx4[15* i +1],d2.x * d2.x * d2.x * d2.y);
-            atomAdd(&dx4[15* i +2],d2.x * d2.x * d2.x * d2.z);
-            atomAdd(&dx4[15* i +3],d2.x * d2.x * d2.y * d2.y);
-            atomAdd(&dx4[15* i +4],d2.x * d2.x * d2.y * d2.z);
-            atomAdd(&dx4[15* i +5],d2.x * d2.x * d2.z * d2.z);
-            atomAdd(&dx4[15* i +6],d2.x * d2.y * d2.y * d2.y);
-            atomAdd(&dx4[15* i +7],d2.x * d2.y * d2.y * d2.z);
-            atomAdd(&dx4[15* i +8],d2.x * d2.y * d2.z * d2.z);
-            atomAdd(&dx4[15* i +9],d2.x * d2.z * d2.z * d2.z);
-            atomAdd(&dx4[15* i +10],d2. y *d2. y *d2. y *d2.y);
-            atomAdd(&dx4[15* i +11],d2. y *d2. y *d2. y *d2.z);
-            atomAdd(&dx4[15* i +12],d2. y *d2. y *d2. z *d2.z);
-            atomAdd(&dx4[15* i +13],d2. y *d2. z *d2. z *d2.z);
-            atomAdd(&dx4[15* i +14],d2. z *d2. z *d2. z *d2.z);
+            atomicAdd(&dx4[15* i +0],d2.x * d2.x * d2.x * d2.x);
+            atomicAdd(&dx4[15* i +1],d2.x * d2.x * d2.x * d2.y);
+            atomicAdd(&dx4[15* i +2],d2.x * d2.x * d2.x * d2.z);
+            atomicAdd(&dx4[15* i +3],d2.x * d2.x * d2.y * d2.y);
+            atomicAdd(&dx4[15* i +4],d2.x * d2.x * d2.y * d2.z);
+            atomicAdd(&dx4[15* i +5],d2.x * d2.x * d2.z * d2.z);
+            atomicAdd(&dx4[15* i +6],d2.x * d2.y * d2.y * d2.y);
+            atomicAdd(&dx4[15* i +7],d2.x * d2.y * d2.y * d2.z);
+            atomicAdd(&dx4[15* i +8],d2.x * d2.y * d2.z * d2.z);
+            atomicAdd(&dx4[15* i +9],d2.x * d2.z * d2.z * d2.z);
+            atomicAdd(&dx4[15* i +10],d2. y *d2. y *d2. y *d2.y);
+            atomicAdd(&dx4[15* i +11],d2. y *d2. y *d2. y *d2.z);
+            atomicAdd(&dx4[15* i +12],d2. y *d2. y *d2. z *d2.z);
+            atomicAdd(&dx4[15* i +13],d2. y *d2. z *d2. z *d2.z);
+            atomicAdd(&dx4[15* i +14],d2. z *d2. z *d2. z *d2.z);
 
             // int3 dix = make_int3(size, iter,3);
 
