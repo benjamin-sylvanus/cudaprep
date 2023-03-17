@@ -35,7 +35,7 @@ __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long se
 }
 // __global__ void simulate(double * savedata,double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state, double *SimulationParams,
 //          double4 *d4swc, int *nlut, int *NewIndex, int *IndexSize, int size, int iter, bool debug)
-__global__ void simulate(double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state, double *SimulationParams,
+__global__ void simulate(double *dx2, double *dx4, int *Bounds, curandStatePhilox4_32_10_t *state, double *SimulationParams,
          double4 *d4swc, int *nlut, int *NewIndex, int *IndexSize, int size, int iter, bool debug) {
     int gid = threadIdx.x + blockDim.x * blockIdx.x;
 
@@ -206,7 +206,7 @@ __global__ void simulate(double *dx2, int *Bounds, curandStatePhilox4_32_10_t *s
             atomicAdd(&dx2[6 * i + 4], d2.y * d2.z);
             atomicAdd(&dx2[6 * i + 5], d2.z * d2.z);
 
-            // Kurtosis
+            // Kurtosis Tensor
             atomAdd(&dx4[15* i +0],d2.x * d2.x * d2.x * d2.x);
             atomAdd(&dx4[15* i +1],d2.x * d2.x * d2.x * d2.y);
             atomAdd(&dx4[15* i +2],d2.x * d2.x * d2.x * d2.z);
