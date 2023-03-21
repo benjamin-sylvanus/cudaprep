@@ -3,6 +3,10 @@
 # Default ignored files
 /shelf/
 /workspace.xml
+/cmake-build-debug
+/cmake-build-debug-event-trace
+.idea
+
 # Editor-based HTTP Client requests
 /httpRequests/
 # Datasource local storage ignored files
@@ -13,7 +17,9 @@ app
 Debug/nsightbuilddata
 /results
 /data
-*.bin
+
+
+
 
 
 
