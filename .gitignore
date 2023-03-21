@@ -11,6 +11,9 @@
 test
 app
 Debug/nsightbuilddata
-/results/*
-/data/*
+/results
+/data
+*.bin
+
+
 
