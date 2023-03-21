@@ -15,16 +15,6 @@
 #include <map>
 using namespace std;
 
-
-
-
-// controller::controller(simulation& sim) : sim(sim) {
-//     this->view = viewer();
-// }
-
-// for string delimiter
-
-
 std::vector<std::string> split(std::string s, std::string delimiter) {
     size_t pos_start = 0, pos_end, delim_len = delimiter.length();
     std::string token;
@@ -42,7 +32,11 @@ std::vector<std::string> split(std::string s, std::string delimiter) {
 
 controller::controller(std::string path)
 {
-  simreader reader(&path);
+
+  // Request Path?
+  this->path = path;
+  simreader reader(&this->path);
+  printf("Reading Files...\n");
   simulation sim(reader);
   this->sim = sim;
   this->view = viewer();
@@ -56,12 +50,18 @@ controller::controller(std::string path)
   {"ss",Controls::StepSize},
   {"pp",Controls::PermeationProbability},
   {"d0",Controls::IntrinsicDiffusivity},
+  {"ii",Controls::Init_in},
   {"d", Controls::Distance},
   {"ts",Controls::TimeStep},
   {"sc",Controls::Scale},
   {"vs",Controls::VoxelSize},
   {"ns",Controls::NStep},
-  {"np",Controls::NPar}};
+  {"np",Controls::NPar},
+  {"q", Controls::Quit},
+  {"Q", Controls::Quit},
+  {"done",Controls::Quit},
+  {"p", Controls::InPath},
+  {"o", Controls::OutPath}};
 
   std::map<std::string, std::string> targets{
   {"c", "Controls::Commands"},
@@ -71,32 +71,24 @@ controller::controller(std::string path)
   {"ss","Controls::StepSize"},
   {"pp","Controls::PermeationProbability"},
   {"d0","Controls::IntrinsicDiffusivity"},
+  {"ii","Controls::Init_in"},
   {"d", "Controls::Distance"},
   {"ts","Controls::TimeStep"},
   {"sc","Controls::Scale"},
   {"vs","Controls::VoxelSize"},
   {"ns","Controls::NStep"},
-  {"np","Controls::NPar"}};
-
+  {"np","Controls::NPar"},
+  {"q","Controls::Quit"},
+  {"Q","Controls::Quit"},
+  {"done", "Controls::Quit"},
+  {"p", "Controls::InPath"},
+  {"o", "Controls::OutPath"}};
 
   this->map = map;
   this->targets = targets;
-
-  // {ss,pp,d0,d,ts,pd,ad,s,vs};
-
-  this->args = {"ss", "pp", "d0", "d", "ts", "pd", "ad", "s", "vs", "ns","np"};
+  this->args = {"ss", "pp", "d0", "ii", "d", "ts", "pd", "ad", "s", "vs", "ns","np"};
   /**
   *
-      simreader reader;
-      std::vector<double> swc; // swc array;
-      std::vector<std::uint64_t> lut; // lut of simulation
-      std::vector<std::uint64_t> index; // index array
-      std::vector<std::uint64_t> pairs; // pairs of swc
-      std::vector<std::uint64_t> bounds; // bounds of geometry
-      double particle_num; // number of particles
-      double step_num; // number of steps to simulate
-      double init_in; // initialize particles inside?
-
       step_size
       perm_prob
       D0
@@ -110,7 +102,7 @@ controller::controller(std::string path)
 }
 
 
-void controller::handlecommand(std::vector<string> sub)
+void controller::handlecommand(std::vector<string> sub, bool * b)
 {
     std::string c = sub[0];
 
@@ -159,6 +151,10 @@ void controller::handlecommand(std::vector<string> sub)
         (sub.size() < 2) ? view.AlertNoParameter(target) : this->sim.setD0(std::stod(sub[1]));
         break;
 
+      case Controls::Init_in:
+        (sub.size() < 2) ? view.AlertNoParameter(target) : this->sim.setInit_in(std::stod(sub[1]));
+        break;
+
       case Controls::Distance:
         //validate additional parameters;
         (sub.size() < 2) ? view.AlertNoParameter(target) : this->sim.setD(std::stod(sub[1]));
@@ -179,6 +175,19 @@ void controller::handlecommand(std::vector<string> sub)
         (sub.size() < 2) ? view.AlertNoParameter(target) : this->sim.setVsize(std::stod(sub[1]));
         break;
 
+      case Controls::Quit:
+        *b = true;
+        break;
+
+      case Controls::InPath:
+        // read a new simulation
+        (sub.size() < 2) ? view.AlertNoParameter(target) : this->setSim(sub[1]);
+        break;
+
+      case Controls::OutPath:
+        (sub.size() < 2) ? view.AlertNoParameter(target) : this->sim.setResultPath(this->path, sub[1]);
+        break;
+
       default:
         printf("Invalid Argument\n");
         break;
@@ -187,11 +196,11 @@ void controller::handlecommand(std::vector<string> sub)
 
   else
   {
-    printf("Invalid Argument");
+    printf("Invalid Argument\n");
   }
 }
 
-void controller::handleinput(std::string buf)
+void controller::handleinput(std::string buf, bool * b)
 {
   std::vector<std::string> elements = split(buf,"-");
 
@@ -200,25 +209,22 @@ void controller::handleinput(std::string buf)
       if (s.length() > 0)
       {
         std::vector<string> sub = split(s," ");
-        handlecommand(sub);
+        handlecommand(sub,b);
       }
   }
 }
 
 void controller::start() {
     view.welcome();
+    bool b = false;
     while (true)
     {
         string buf;
         getline(cin,buf);
-        bool b = (buf == "q" || buf == "Q" || buf == "done");
+        handleinput(buf,&b);
         if(b)
         {
            break;
-        }
-        else
-        {
-          handleinput(buf);
         }
     }
 }
@@ -226,4 +232,12 @@ void controller::start() {
 simulation controller::getSim()
 {
   return this->sim;
+}
+
+void controller::setSim(string path)
+{
+  simreader reader(&path);
+  printf("Reading Files...\n");
+  simulation sim(reader);
+  this->sim = sim;
 }

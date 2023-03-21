@@ -30,6 +30,7 @@ private:
     std::vector<std::vector<uint64_t>> arraydims;
     double scale;
     double vsize;
+    std::string resultPath;
 
 public:
     // Constructors
@@ -55,18 +56,20 @@ public:
     void setbounds();
     void setParameterdata();
     void setArraydims();
+    void setResultPath(std::string genpath,std::string path);
 
     // Accessors
-    [[nodiscard]] double getScale() const;
-    [[nodiscard]] double getVsize() const;
-    [[nodiscard]] double getParticle_num() const;
-    [[nodiscard]] double getStep_num() const;
-    [[nodiscard]] double getInit_in() const;
-    [[nodiscard]] double getStep_size();
-    [[nodiscard]] double getPerm_prob() const;
-    [[nodiscard]] double getD0() const;
-    [[nodiscard]] double getD() const;
-    [[nodiscard]] double getTstep() const;
+    double getScale() const;
+    double getVsize() const;
+    double getParticle_num() const;
+    double getStep_num() const;
+    double getInit_in() const;
+    double getStep_size();
+    double getPerm_prob() const;
+    double getD0() const;
+    double getD() const;
+    double getTstep() const;
+    std::string getResultPath() const; 
     std::vector<double> getSwc();
     std::vector<std::uint64_t> getLut();
     std::vector<std::uint64_t> getIndex();
@@ -74,6 +77,7 @@ public:
     std::vector<std::uint64_t> getbounds();
     std::vector<double> getParameterdata();
     std::vector<std::vector<uint64_t>> getArraydims();
+
 
 
     /**Facilitators:

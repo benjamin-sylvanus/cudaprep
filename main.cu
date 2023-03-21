@@ -1,6 +1,5 @@
 #include "./src/simreader.h"
 #include "./src/simulation.h"
-#include "./src/particle.h"
 #include "./src/controller.h"
 #include "./src/viewer.h"
 #include "./src/funcs.h"
@@ -16,7 +15,6 @@
 #include <cstring>
 #include <curand.h>
 #include <curand_kernel.h>
-#include <fstream>
 #include <fstream>
 #include <chrono>
 #include <thread>
@@ -36,7 +34,7 @@ __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long se
 // __global__ void simulate(double * savedata,double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state, double *SimulationParams,
 //          double4 *d4swc, int *nlut, int *NewIndex, int *IndexSize, int size, int iter, bool debug)
 __global__ void simulate(double *dx2, double *dx4, int *Bounds, curandStatePhilox4_32_10_t *state, double *SimulationParams,
-         double4 *d4swc, int *nlut, int *NewIndex, int *IndexSize, int size, int iter, bool debug) {
+         double4 *d4swc, int *nlut, int *NewIndex, int *IndexSize, int size, int iter, bool debug, double3 point) {
     int gid = threadIdx.x + blockDim.x * blockIdx.x;
 
     if (gid < size) {
@@ -60,7 +58,6 @@ __global__ void simulate(double *dx2, double *dx4, int *Bounds, curandStatePhilo
         double3 d2 = make_double3(0.0, 0.0, 0.0);
         bool completes;
         bool flag;
-
         double step = step_size;
 
         // init local state var
@@ -69,7 +66,7 @@ __global__ void simulate(double *dx2, double *dx4, int *Bounds, curandStatePhilo
 
         // initialize position inside cell
         A = initPosition(gid, dx2, Bounds, state, SimulationParams, d4swc, nlut, NewIndex, IndexSize,
-                         size, iter,init_in, debug);
+                         size, iter,init_in, debug, point);
 
         // record initial position
         xnot = make_double3(A.x, A.y, A.z);
@@ -78,7 +75,8 @@ __global__ void simulate(double *dx2, double *dx4, int *Bounds, curandStatePhilo
         flag = 0;
 
         // state is based on intialization conditions if particles are required to start inside then parstate -> [1,1]
-        parstate = make_int2(1, 1);
+        // todo figure out how to get parstate from init position function... requires a global parstate.
+        parstate = make_int2(0, 1);
 
         // iterate over steps
         for (int i = 0; i < iter; i++) {
@@ -185,7 +183,12 @@ __global__ void simulate(double *dx2, double *dx4, int *Bounds, curandStatePhilo
                     if (!completes && parstate.x && !parstate.y) {
                         flag = true;
                     }
+                    if (!parstate.x && !parstate.y)
+                    {
+                        A = nextpos;
+                    }
                 }
+
             } else {
                 // update flag for next step
                 flag = false;
@@ -259,14 +262,16 @@ int main() {
     /**
      * Read Simulation and Initialize Object
      */
-    std::string path = "./data";
+    std::string path = "/autofs/space/symphony_002/users/BenSylvanus/cuda/Sims/";
+    std::string dataPath = path;
+    dataPath.append("data");
 
-    controller control(path);
+    size_t len = path.length();
+    controller control(dataPath);
     control.start();
     system("clear");
 
     double simparam[10];
-
     simulation sim = control.getSim();
     size = sim.getParticle_num();
     iter = sim.getStep_num();
@@ -297,9 +302,7 @@ int main() {
     int boundx = (int) bounds[0];
     int boundy = (int) bounds[1];
     int boundz = (int) bounds[2];
-
     int prod = (int) (boundx * boundy * boundz);
-
     std::vector<double> r_swc = sim.getSwc();
     int nrow = r_swc.size() / 6;
     /**
@@ -450,7 +453,7 @@ int main() {
     cudaMalloc((int **) &deviceBounds, 3 * sizeof(int));
     cudaMalloc((curandStatePhilox4_32_10_t * *) & deviceState, size * sizeof(curandStatePhilox4_32_10_t));
     cudaMalloc((double **) &deviceSimP, 10 * sizeof(double));
-    cudaMalloc((double4 * *) & deviced4Swc, nrow * sizeof(double4));
+    cudaMalloc((double4 * *) &deviced4Swc, nrow * sizeof(double4));
     cudaMalloc((int **) &deviceNewLut, prod * sizeof(int));
     cudaMalloc((int **) &deviceNewIndex, newindexsize * sizeof(int));
     cudaMalloc((int **) &deviceIndexSize, 3 * sizeof(int));
@@ -474,7 +477,7 @@ int main() {
      */
     // option for printing in kernel
     bool debug = false;
-
+    double3 point = make_double3(6.0,6.0,6.0);
     /**
      * Call Kernel
     */
@@ -484,7 +487,7 @@ int main() {
     //                           deviceIndexSize, size, iter, debug);
     simulate<<<grid, block>>>(devicedx2, devicedx4, deviceBounds, deviceState, deviceSimP, deviced4Swc,
                               deviceNewLut, deviceNewIndex,
-                              deviceIndexSize, size, iter, debug);
+                              deviceIndexSize, size, iter, debug,point);
     cudaEventRecord(stop_c);
     // Wait for results
     cudaDeviceSynchronize();
@@ -522,64 +525,15 @@ int main() {
     duration<double, std::milli> ms_double = t2 - t1;
     printf("%f seconds\n", ms_double.count()/1e3);
     printf("Writing results: ");
+
+    // Check outdir exists
+    // isdir()?  mkdir : ...
+    std::string outpath = path.append("results/");
     t1 = high_resolution_clock::now();
-    /**
-    * Write Results to file
-    We need to write
-    hostdx2
-    */
-    double t[iter];
-    double tstep = hostSimP[8];
-    double mdx_2[6 * iter];
-    for (int i = 0; i < iter; i++) {
-        t[i] = tstep * i;
-        mdx_2[6 * i + 0] = (hostdx2[6 * i + 0] / size) / (2.0 * t[i]);
-        mdx_2[6 * i + 1] = (hostdx2[6 * i + 1] / size) / (2.0 * t[i]);
-        mdx_2[6 * i + 2] = (hostdx2[6 * i + 2] / size) / (2.0 * t[i]);
-        mdx_2[6 * i + 3] = (hostdx2[6 * i + 3] / size) / (2.0 * t[i]);
-        mdx_2[6 * i + 4] = (hostdx2[6 * i + 4] / size) / (2.0 * t[i]);
-        mdx_2[6 * i + 5] = (hostdx2[6 * i + 5] / size) / (2.0 * t[i]);
-    }
-
-    std::ofstream fdx2out("./results/dx2.txt");
-    std::ofstream fmdx2out("./results/mdx2.txt");
-    fdx2out.precision(15);
-    fmdx2out.precision(15);
-
-    for (int i = 0; i < iter; i++) {
-
-        for (int j = 0; j < 6; j++) {
-
-            if (j == 5) {
-                fdx2out << hostdx2[i * 6 + j] << endl;
-            } else {
-                fdx2out << hostdx2[i * 6 + j] << "\t";
-            }
-            if (j == 5) {
-                fmdx2out << mdx_2[i * 6 + j] << endl;
-            } else {
-                fmdx2out << mdx_2[i * 6 + j] << "\t";
-            }
-        }
-    }
-
-    // FILE * outFile = fopen("./results/filename.bin", "wb");
-    // fwrite (hostAllData,sizeof(double),iter*size*3,outFile);
-    // fclose (outFile);
-
-    FILE * outFile = fopen("./results/swc.bin","wb");
-    fwrite (w_swc,sizeof(double),8,outFile);
-    fclose(outFile);
-
-    outFile = fopen("./results/outcfg.bin","wb");
-    fwrite (hostSimP,sizeof(double),10,outFile);
-    fclose(outFile);
-
+    writeResults(hostdx2, hostdx4, hostSimP,  w_swc,  iter, size, outpath);
     t2 = high_resolution_clock::now();
     ms_double = t2 - t1;
     printf("%f seconds\n", ms_double.count()/1e3);
-    fdx2out.close();
-    fmdx2out.close();
 
     /**
      * Free Host Data

@@ -9,7 +9,7 @@
 #define CUDAPREP_DATATEMPLATE_H
 
 template<class T>
-class datatemplate{
+class datatemplate {
 public:
     explicit datatemplate<T>(std::string path);
     void load_data();

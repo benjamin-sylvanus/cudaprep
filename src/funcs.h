@@ -50,8 +50,8 @@ __device__ double3
  */
 initPosition(int gid, double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state,
                     double *SimulationParams, double4 *d4swc, int *nlut, int *NewIndex,
-                    int *IndexSize, int size, int iter,int init_in, bool debug);
-                    
+                    int *IndexSize, int size, int iter,int init_in, bool debug, double3 point);
+
 
 
 __device__ void
@@ -76,3 +76,7 @@ __device__ double3
  * @param step step size of simulation
  */
  setNextPos(double3 nextpos,double3 A,double4 xi, double step);
+
+
+ __host__
+ void writeResults(double * hostdx2, double * hostdx4, double * hostSimP, double * w_swc, int iter, int size, std::string outpath);

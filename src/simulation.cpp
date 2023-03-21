@@ -6,9 +6,9 @@
 
 #include "simulation.h"
 #include "iostream"
-#include<random>
-#include<cmath>
-#include<chrono>
+#include <random>
+#include <cmath>
+#include <chrono>
 #include <iostream>
 
 #pragma clang diagnostic push
@@ -33,6 +33,7 @@ simulation::simulation(simreader reader) {
     this->scale = this->parameterdata[7];
     this->tstep = this->parameterdata[8];
     this->vsize = this->parameterdata[9];
+    this->resultPath = "/results";
 }
 
 simulation::simulation()
@@ -62,6 +63,8 @@ double simulation::getD() const { return this->d; }
 
 double simulation::getTstep() const { return this->tstep; }
 
+std::string simulation::getResultPath() const {return this->resultPath; }
+
 std::vector<double> simulation::getSwc() { return this->swc; }
 
 std::vector <std::uint64_t> simulation::getLut() { return this->lut; }
@@ -75,6 +78,8 @@ std::vector <std::uint64_t> simulation::getbounds() { return this->bounds; }
 std::vector<double> simulation::getParameterdata() { return this->parameterdata; }
 
 std::vector <std::vector<uint64_t>> simulation::getArraydims() { return this->arraydims; }
+
+
 
 /**
  <li> particle_num = SimulationParams[0] </li>
@@ -176,10 +181,13 @@ void simulation::setArraydims() {
     printf("Unsupported\n");
 }
 
+void simulation::setResultPath(std::string genpath,std::string path)
+{
+  printf("Root:\t%s\nResultPath: \t%s -> %s\n",genpath.c_str(), this->resultPath.c_str(), path.c_str());
+  this->resultPath = path;
+}
+
 double *simulation::nextPosition(double *nexts) const {
-    // auto elapsed = clock();
-    // clock_t time_req;
-    // time_req = clock();
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::mt19937 generator(seed);
     std::uniform_real_distribution<double> uniform01(0.0, 1.0);
@@ -193,15 +201,9 @@ double *simulation::nextPosition(double *nexts) const {
         nexts[3 * i + 1] = sin(phi) * sin(theta);
         nexts[3 * i + 2] = cos(phi);
     }
-//    time_req = clock()-time_req;
-//    std::cout << std::endl << (float)time_req/CLOCKS_PER_SEC << " seconds" << std::endl;
 
     return nexts;
 }
-
-
-
-// todo: implement a display method
 
 #pragma clang diagnostic pop
 #pragma clang diagnostic pop

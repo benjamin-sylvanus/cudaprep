@@ -19,13 +19,17 @@ Args,
 Show,
 StepSize,
 PermeationProbability,
+Init_in,
 IntrinsicDiffusivity,
 Distance,
 TimeStep,
 Scale,
 VoxelSize,
 NStep,
-NPar
+NPar,
+Quit,
+InPath,
+OutPath
 };
 
 class controller {
@@ -33,6 +37,7 @@ private:
 
     simulation sim;
     viewer view;
+    std::string path;
     std::vector<std::string> commands;
     std::vector<std::string> args;
     std::map<std::string, Controls> map;
@@ -43,10 +48,10 @@ public:
     // explicit controller(simulation& sim);
     explicit controller(std::string path);
     void start();
-    void handleinput(std::string input);
-    void handlecommand(std::vector<std::string>  command);
+    void handleinput(std::string input,bool * b);
+    void handlecommand(std::vector<std::string>  command, bool * b);
     simulation getSim();
-
+    void setSim(std::string path);
 };
 
 

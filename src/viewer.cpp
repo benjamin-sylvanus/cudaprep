@@ -80,20 +80,8 @@ void viewer::show(simulation sim) {
     cout << "D0: " << sim.getD0() << endl;
     cout << "D: " << sim.getD() << endl;
     cout << "Tstep: " << sim.getTstep() << endl;
+    cout << "Path: " << sim.getResultPath() << endl;
 
-    // std::vector<double> simulation::getSwc()
-    //
-    // std::vector <std::uint64_t> simulation::getLut()
-    //
-    // std::vector <std::uint64_t> simulation::getIndex()
-    //
-    // std::vector <std::uint64_t> simulation::getPairs()
-    //
-    // std::vector <std::uint64_t> simulation::getbounds()
-    //
-    // std::vector<double> simulation::getParameterdata()
-    //
-    // std::vector <std::vector<uint64_t>> simulation::getArraydims()
 }
 
 void viewer::welcome() {
@@ -110,7 +98,7 @@ void viewer::welcome() {
 viewer::viewer() {
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
     this->command = "-h help\n-c commands\n-s show configuration\n-d <arg> show argument\n-<arg> <value> set argument to value\n-args show arguments";
-    this->help = "-c -a will show options for input.\n arguments require a parameter.\n For example to change the number of particles the input is <-np 10000>\n\nInputs can be chained:\t <-ns 2000 -np 1000> sets the particle number to 1000 and step number to 2000.\n\n For additional information checkout the ReadMe or documentation on github."
+    this->help = "-c -a will show options for input.\nArguments require a parameter:\n\t<-np 10000> sets the particle number to 10000\n\nInputs can be chained:\n\t<-ns 2000 -np 1000> sets the particle number to 1000 and step number to 2000.\n\nFor additional information checkout the ReadMe or documentation on github.";
     this->str.assign(w.ws_col, '-');
 }
 
@@ -146,8 +134,9 @@ void viewer::showHelp() {
     cout << help << endl;
 }
 
-void viewer::AlertNoParameter(std::string target) {
+void viewer::AlertNoParameter(std::string target)
+{
     //Use red to alert
     cout << colors["y"] << str << colors["r"] << target << " requires additional parameters." << endl << colors["y"]
-         << str << endl << colors["w"] << endl;
+    << str << endl << colors["w"] << endl;
 }

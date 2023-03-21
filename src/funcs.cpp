@@ -14,19 +14,10 @@
 #include <fstream>
 
 __device__ bool swc2v(double3 nextpos, double4 child, double4 parent, double dist) {
-    /**
-    * @brief calculation for tangent line
-    * <li> r = r1 + sqrt((x-x1).^2 + (y-y1).^2 + (z-z1).^2) / sqrt((x2-x1)^2+(parent.y-y1)^2+(parent.z-z1)^2) * (r2-r1) </li>
-    * <li> r = ( c + r2 ) / (sqrt ( 1 - ( |r1-r2 | / l ) ) </li>
-    * <li>c = ( |r1 - r2| * l ) / L </li>
-   */
-    // bool pos1;
     bool pos;
-
     if (dist == 0) {
         dist = 0.000000000000000001;
     }
-
     double t = ((nextpos.x - child.x) * (parent.x - child.x) + (nextpos.y - child.y) * (parent.y - child.y) +
                 (nextpos.z - child.z) * (parent.z - child.z)) / dist;
     double x = child.x + (parent.x - child.x) * t;
@@ -34,31 +25,10 @@ __device__ bool swc2v(double3 nextpos, double4 child, double4 parent, double dis
     double z = child.z + (parent.z - child.z) * t;
     double cr2 = pow(child.w, 2);
     double pr2 = pow(parent.w, 2);
-
-    /**
-    L = sqrt((x2 - x1) ^ 2 + (y2 - y1) ^ 2 + (z2 - z1) ^ 2);
-    sin_theta = abs(r1-r2)/L;
-    cos_theta = sqrt(1-sin_theta^2);
-    list1 = (t > (r1*sin_theta/L)) .* (t < (1+r2*sin_theta/L));
-    list1 = logical(list1);
-    m = (r2-r1)*cos_theta/(L+(r2-r1)*sin_theta);
-    % distance btw x and x1
-    rx = L*t;
-    % distance btw tangent surface to the line x1-x2 at rx
-    ry = m*rx + (cos_theta - m*sin_theta) * r1;
-    pos1 = dist2 < (ry .^ 2); % smaller in one line and less than and equal
-    pos = pos1;
-    */
-
     double L = sqrt(pow(parent.x-child.x,2) + pow(parent.y-child.y,2) + pow(parent.z-child.z,2));
-
     double sin_theta = fabs(child.w - parent.w)/L;
-
     double cos_theta = sqrt(1-pow(sin_theta,2));
-    // printf("(t > ( (child.w * sin_theta) / L)): %d,\tt < (1 + (parent.w * sin_theta): %d\n",(t > (child.w * sin_theta) / L),(t < (1 + (parent.w * sin_theta)/L)));
     bool list1 = (t > ( (child.w * sin_theta) / L)) && (t < (1 + (parent.w * sin_theta) / L));
-    // printf("List1: %d\n",list1);
-
     if (list1)
     {
       double dist2 = (pow(nextpos.x - x, 2) + pow(nextpos.y - y, 2) + pow(nextpos.z - z, 2));
@@ -72,33 +42,6 @@ __device__ bool swc2v(double3 nextpos, double4 child, double4 parent, double dis
       pos = (pow(nextpos.x - child.x, 2) + pow(nextpos.y - child.y, 2) + pow(nextpos.z - child.z, 2)) < cr2 ||
              (pow(nextpos.x - parent.x, 2) + pow(nextpos.y - parent.y, 2) + pow(nextpos.z - parent.z, 2)) < pr2;
     }
-
-    // double rd = fabs(child.w - parent.w);
-    // if (dist < cr2) {
-    //     list1 = false;
-    // } else {
-    //     list1 = (x - child.x) * (x - parent.x) + (y - child.y) * (y - parent.y) + (z - child.z) * (z - parent.z) < 0.0;
-    // }
-    // if (list1) {
-    //     double dist2 = (pow(nextpos.x - x, 2) + pow(nextpos.y - y, 2) + pow(nextpos.z - z, 2));
-    //
-    //     // distance from orthogonal vector to p2
-    //     double l = sqrt(pow(x - parent.x, 2) + pow(y - parent.y, 2) + pow(z - parent.z, 2));
-    //
-    //     // distance from p1 -> p2
-    //     double L = sqrt(dist);
-    //
-    //     double c = (rd * l) / L;
-    //     double r = (c + parent.w) / sqrt(1 - ((rd / L) * (rd / L)));
-    //     pos1 = dist2 < (pow(r, 2));
-    //     pos = pos1;
-    // } else {
-    //     double lower = (pow(nextpos.x - child.x, 2) + pow(nextpos.y - child.y, 2) + pow(nextpos.z - child.z, 2));
-    //     double higher = (pow(nextpos.x - parent.x, 2) + pow(nextpos.y - parent.y, 2) + pow(nextpos.z - parent.z, 2));
-    //     pos1 = (pow(nextpos.x - child.x, 2) + pow(nextpos.y - child.y, 2) + pow(nextpos.z - child.z, 2)) < cr2 ||
-    //            (pow(nextpos.x - parent.x, 2) + pow(nextpos.y - parent.y, 2) + pow(nextpos.z - parent.z, 2)) < pr2;
-    //     pos = pos1;
-    // }
     return pos;
 }
 
@@ -109,7 +52,7 @@ __device__ __host__ int s2i(int3 i, int3 b) {
 
 __device__ double3 initPosition(int gid, double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state,
                     double *SimulationParams, double4 *d4swc, int *nlut, int *NewIndex,
-                    int *IndexSize, int size, int iter, int init_in, bool debug) {
+                    int *IndexSize, int size, int iter, int init_in, bool debug, double3 point) {
 
     double3 nextpos;
     int3 upper;
@@ -124,6 +67,29 @@ __device__ double3 initPosition(int gid, double *dx2, int *Bounds, curandStatePh
     double3 A;
     parstate.y = 0;
     bool cont = true;
+
+
+    // todo implement different particle initial states;
+    /**
+    * Case 1: particles inside.
+    * Case 2: Particles outside.
+    * Case 3: Particles at point.
+
+    Case 1 done
+    Case 2:
+    // init local state var
+    xr = curand_uniform4_double(&localstate);
+
+    // set particle initial position
+    A = make_double3(xr.x * b_d3.x, xr.y * b_d3.y, xr.z * b_d3.z);
+
+    Case 3:
+    A point must be passed to this function -> point
+
+    A = make double3(point.x,point.y point.z);
+    */
+    if (init_in == 1)
+    {
     while (cont) {
 
         // init local state var
@@ -187,6 +153,20 @@ __device__ double3 initPosition(int gid, double *dx2, int *Bounds, curandStatePh
             }
         }
     }
+  }
+  if (init_in == 2)
+  {
+    printf("I Made it here\n");
+    // init local state var
+    xr = curand_uniform4_double(&localstate);
+
+    // set particle initial position
+    A = make_double3(xr.x * b_d3.x, xr.y * b_d3.y, xr.z * b_d3.z);
+  }
+  if (init_in == 3)
+  {
+    A = make_double3(point.x,point.y,point.z);
+  }
     return A;
 }
 
@@ -222,4 +202,71 @@ __device__ double3 setNextPos(double3 nextpos, double3 A, double4 xi, double ste
     nextpos.y = A.y + ((2.0 * xi.y - 1.0) * step);
     nextpos.z = A.z + ((2.0 * xi.z - 1.0) * step);
     return nextpos;
+}
+
+__host__ void writeResults(double * hostdx2, double * hostdx4, double * hostSimP, double * w_swc, int iter, int size, std::string outpath)
+{
+  double t[iter];
+  double tstep = hostSimP[8];
+  double mdx_2[6 * iter];
+  double mdx_4[15 * iter];
+  for (int i = 0; i < iter; i++) {
+      t[i] = tstep * i;
+      mdx_2[6 * i + 0] = (hostdx2[6 * i + 0] / size) / (2.0 * t[i]);
+      mdx_2[6 * i + 1] = (hostdx2[6 * i + 1] / size) / (2.0 * t[i]);
+      mdx_2[6 * i + 2] = (hostdx2[6 * i + 2] / size) / (2.0 * t[i]);
+      mdx_2[6 * i + 3] = (hostdx2[6 * i + 3] / size) / (2.0 * t[i]);
+      mdx_2[6 * i + 4] = (hostdx2[6 * i + 4] / size) / (2.0 * t[i]);
+      mdx_2[6 * i + 5] = (hostdx2[6 * i + 5] / size) / (2.0 * t[i]);
+      mdx_4[15 * i + 0] = (hostdx4[15 * i + 0] / size) / (2.0 * t[i]);
+      mdx_4[15 * i + 1] = (hostdx4[15 * i + 1] / size) / (2.0 * t[i]);
+      mdx_4[15 * i + 2] = (hostdx4[15 * i + 2] / size) / (2.0 * t[i]);
+      mdx_4[15 * i + 3] = (hostdx4[15 * i + 3] / size) / (2.0 * t[i]);
+      mdx_4[15 * i + 4] = (hostdx4[15 * i + 4] / size) / (2.0 * t[i]);
+      mdx_4[15 * i + 5] = (hostdx4[15 * i + 5] / size) / (2.0 * t[i]);
+      mdx_4[15 * i + 6] = (hostdx4[15 * i + 6] / size) / (2.0 * t[i]);
+      mdx_4[15 * i + 7] = (hostdx4[15 * i + 7] / size) / (2.0 * t[i]);
+      mdx_4[15 * i + 8] = (hostdx4[15 * i + 8] / size) / (2.0 * t[i]);
+      mdx_4[15 * i + 9] = (hostdx4[15 * i + 9] / size) / (2.0 * t[i]);
+      mdx_4[15 * i + 10] = (hostdx4[15 * i + 10] / size) / (2.0 * t[i]);
+      mdx_4[15 * i + 11] = (hostdx4[15 * i + 11] / size) / (2.0 * t[i]);
+      mdx_4[15 * i + 12] = (hostdx4[15 * i + 12] / size) / (2.0 * t[i]);
+      mdx_4[15 * i + 13] = (hostdx4[15 * i + 13] / size) / (2.0 * t[i]);
+      mdx_4[15 * i + 14] = (hostdx4[15 * i + 14] / size) / (2.0 * t[i]);
+  }
+
+  // FILE * outFile = fopen("./results/filename.bin", "wb");
+  // fwrite (hostAllData,sizeof(double),iter*size*3,outFile);
+  // fclose (outFile);
+
+  std::string dx2Path = outpath; dx2Path.append("dx2.bin");
+  std::string mdx2Path = outpath; mdx2Path.append("mdx2.bin");
+  std::string dx4Path = outpath; dx4Path.append("dx4.bin");
+  std::string mdx4Path = outpath; mdx4Path.append("mdx4.bin");
+  std::string swcpath = outpath; swcpath.append("swc.bin");
+  std::string cfgpath = outpath; cfgpath.append("outcfg.bin");
+
+  FILE * outFile = fopen(swcpath.c_str(),"wb");
+  fwrite (w_swc,sizeof(double),8,outFile);
+  fclose(outFile);
+
+  outFile = fopen(cfgpath.c_str(),"wb");
+  fwrite (hostSimP,sizeof(double),10,outFile);
+  fclose(outFile);
+
+  outFile = fopen(dx2Path.c_str(),"wb");
+  fwrite (hostdx2,sizeof(double),6 * iter,outFile);
+  fclose(outFile);
+
+  outFile = fopen(mdx2Path.c_str(),"wb");
+  fwrite (mdx_2,sizeof(double),6 * iter,outFile);
+  fclose(outFile);
+
+  outFile = fopen(dx4Path.c_str(),"wb");
+  fwrite (hostdx4,sizeof(double),15 * iter,outFile);
+  fclose(outFile);
+
+  outFile = fopen(dx4Path.c_str(),"wb");
+  fwrite(mdx_4,sizeof(double),15 * iter,outFile);
+  fclose(outFile);
 }
