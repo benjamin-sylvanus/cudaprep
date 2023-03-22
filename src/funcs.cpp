@@ -204,38 +204,40 @@ __device__ double3 setNextPos(double3 nextpos, double3 A, double4 xi, double ste
     return nextpos;
 }
 
-__host__ void writeResults(double * hostdx2, double * hostdx4, double * hostSimP, double * w_swc, int iter, int size, std::string outpath)
+__host__ void writeResults(double * hostdx2, double * hostdx4, double * mdx2, double * mdx4, double * hostSimP, double * w_swc, int iter, int size, int nrow, std::string outpath)
 {
+  // Check outdir exists
+  // isdir()?  mkdir : ...
+
   double t[iter];
   double tstep = hostSimP[8];
-  double mdx_2[6 * iter];
-  double mdx_4[15 * iter];
   for (int i = 0; i < iter; i++) {
       t[i] = tstep * i;
-      mdx_2[6 * i + 0] = (hostdx2[6 * i + 0] / size) / (2.0 * t[i]);
-      mdx_2[6 * i + 1] = (hostdx2[6 * i + 1] / size) / (2.0 * t[i]);
-      mdx_2[6 * i + 2] = (hostdx2[6 * i + 2] / size) / (2.0 * t[i]);
-      mdx_2[6 * i + 3] = (hostdx2[6 * i + 3] / size) / (2.0 * t[i]);
-      mdx_2[6 * i + 4] = (hostdx2[6 * i + 4] / size) / (2.0 * t[i]);
-      mdx_2[6 * i + 5] = (hostdx2[6 * i + 5] / size) / (2.0 * t[i]);
-      mdx_4[15 * i + 0] = (hostdx4[15 * i + 0] / size) / (2.0 * t[i]);
-      mdx_4[15 * i + 1] = (hostdx4[15 * i + 1] / size) / (2.0 * t[i]);
-      mdx_4[15 * i + 2] = (hostdx4[15 * i + 2] / size) / (2.0 * t[i]);
-      mdx_4[15 * i + 3] = (hostdx4[15 * i + 3] / size) / (2.0 * t[i]);
-      mdx_4[15 * i + 4] = (hostdx4[15 * i + 4] / size) / (2.0 * t[i]);
-      mdx_4[15 * i + 5] = (hostdx4[15 * i + 5] / size) / (2.0 * t[i]);
-      mdx_4[15 * i + 6] = (hostdx4[15 * i + 6] / size) / (2.0 * t[i]);
-      mdx_4[15 * i + 7] = (hostdx4[15 * i + 7] / size) / (2.0 * t[i]);
-      mdx_4[15 * i + 8] = (hostdx4[15 * i + 8] / size) / (2.0 * t[i]);
-      mdx_4[15 * i + 9] = (hostdx4[15 * i + 9] / size) / (2.0 * t[i]);
-      mdx_4[15 * i + 10] = (hostdx4[15 * i + 10] / size) / (2.0 * t[i]);
-      mdx_4[15 * i + 11] = (hostdx4[15 * i + 11] / size) / (2.0 * t[i]);
-      mdx_4[15 * i + 12] = (hostdx4[15 * i + 12] / size) / (2.0 * t[i]);
-      mdx_4[15 * i + 13] = (hostdx4[15 * i + 13] / size) / (2.0 * t[i]);
-      mdx_4[15 * i + 14] = (hostdx4[15 * i + 14] / size) / (2.0 * t[i]);
+      mdx2[6 * i + 0] = (hostdx2[6 * i + 0] / size) / (2.0 * t[i]);
+      mdx2[6 * i + 1] = (hostdx2[6 * i + 1] / size) / (2.0 * t[i]);
+      mdx2[6 * i + 2] = (hostdx2[6 * i + 2] / size) / (2.0 * t[i]);
+      mdx2[6 * i + 3] = (hostdx2[6 * i + 3] / size) / (2.0 * t[i]);
+      mdx2[6 * i + 4] = (hostdx2[6 * i + 4] / size) / (2.0 * t[i]);
+      mdx2[6 * i + 5] = (hostdx2[6 * i + 5] / size) / (2.0 * t[i]);
+      mdx4[15 * i + 0] = (hostdx4[15 * i + 0] / size) / (2.0 * t[i]);
+      mdx4[15 * i + 1] = (hostdx4[15 * i + 1] / size) / (2.0 * t[i]);
+      mdx4[15 * i + 2] = (hostdx4[15 * i + 2] / size) / (2.0 * t[i]);
+      mdx4[15 * i + 3] = (hostdx4[15 * i + 3] / size) / (2.0 * t[i]);
+      mdx4[15 * i + 4] = (hostdx4[15 * i + 4] / size) / (2.0 * t[i]);
+      mdx4[15 * i + 5] = (hostdx4[15 * i + 5] / size) / (2.0 * t[i]);
+      mdx4[15 * i + 6] = (hostdx4[15 * i + 6] / size) / (2.0 * t[i]);
+      mdx4[15 * i + 7] = (hostdx4[15 * i + 7] / size) / (2.0 * t[i]);
+      mdx4[15 * i + 8] = (hostdx4[15 * i + 8] / size) / (2.0 * t[i]);
+      mdx4[15 * i + 9] = (hostdx4[15 * i + 9] / size) / (2.0 * t[i]);
+      mdx4[15 * i + 10] = (hostdx4[15 * i + 10] / size) / (2.0 * t[i]);
+      mdx4[15 * i + 11] = (hostdx4[15 * i + 11] / size) / (2.0 * t[i]);
+      mdx4[15 * i + 12] = (hostdx4[15 * i + 12] / size) / (2.0 * t[i]);
+      mdx4[15 * i + 13] = (hostdx4[15 * i + 13] / size) / (2.0 * t[i]);
+      mdx4[15 * i + 14] = (hostdx4[15 * i + 14] / size) / (2.0 * t[i]);
   }
+  FILE * outFile;
 
-  // FILE * outFile = fopen("./results/filename.bin", "wb");
+  // outFile = fopen("./results/filename.bin", "wb");
   // fwrite (hostAllData,sizeof(double),iter*size*3,outFile);
   // fclose (outFile);
 
@@ -245,9 +247,12 @@ __host__ void writeResults(double * hostdx2, double * hostdx4, double * hostSimP
   std::string mdx4Path = outpath; mdx4Path.append("mdx4.bin");
   std::string swcpath = outpath; swcpath.append("swc.bin");
   std::string cfgpath = outpath; cfgpath.append("outcfg.bin");
+  std::string tpath = outpath; tpath.append("t.bin");
 
-  FILE * outFile = fopen(swcpath.c_str(),"wb");
-  fwrite (w_swc,sizeof(double),8,outFile);
+
+  outFile = fopen(swcpath.c_str(),"wb");
+
+  fwrite (w_swc,sizeof(double),nrow*4,outFile);
   fclose(outFile);
 
   outFile = fopen(cfgpath.c_str(),"wb");
@@ -259,14 +264,18 @@ __host__ void writeResults(double * hostdx2, double * hostdx4, double * hostSimP
   fclose(outFile);
 
   outFile = fopen(mdx2Path.c_str(),"wb");
-  fwrite (mdx_2,sizeof(double),6 * iter,outFile);
+  fwrite (mdx2,sizeof(double),6 * iter,outFile);
   fclose(outFile);
 
   outFile = fopen(dx4Path.c_str(),"wb");
   fwrite (hostdx4,sizeof(double),15 * iter,outFile);
   fclose(outFile);
 
-  outFile = fopen(dx4Path.c_str(),"wb");
-  fwrite(mdx_4,sizeof(double),15 * iter,outFile);
+  outFile = fopen(mdx4Path.c_str(),"wb");
+  fwrite(mdx4,sizeof(double),15 * iter,outFile);
+  fclose(outFile);
+
+  outFile = fopen(tpath.c_str(),"wb");
+  fwrite(t,sizeof(double),iter,outFile);
   fclose(outFile);
 }

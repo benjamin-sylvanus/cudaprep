@@ -371,6 +371,8 @@ int main() {
     int *hostNewIndex;
     int *hostIndexSize;
     double4 *hostD4Swc;
+    double * mdx2;
+    double * mdx4;
     // double *hostAllData;
 
     // Alloc Memory for Host Pointers
@@ -382,11 +384,15 @@ int main() {
     hostNewLut = (int *) malloc(prod * sizeof(int));
     hostNewIndex = (int *) malloc(newindexsize * sizeof(int));
     hostIndexSize = (int *) malloc(3 * sizeof(int));
+    mdx2 = (double *) malloc(6 * iter * sizeof(double));
+    mdx4 = (double *) malloc(15 * iter * sizeof(double));
     // hostAllData = (double *) malloc(3 * iter * size * sizeof(double));
 
     // Set Values for Host
     memset(hostdx2, 0.0, 6 * iter * sizeof(double));
     memset(hostdx4, 0.0, 15 * iter * sizeof(double));
+    memset(mdx2,0.0,6*iter*sizeof(double));
+    memset(mdx4,0.0,15*iter*sizeof(double));
     // memset(hostAllData, 0.0, 3 * iter * size * sizeof(double));
 
 
@@ -525,12 +531,9 @@ int main() {
     duration<double, std::milli> ms_double = t2 - t1;
     printf("%f seconds\n", ms_double.count()/1e3);
     printf("Writing results: ");
-
-    // Check outdir exists
-    // isdir()?  mkdir : ...
     std::string outpath = path.append("results/");
     t1 = high_resolution_clock::now();
-    writeResults(hostdx2, hostdx4, hostSimP,  w_swc,  iter, size, outpath);
+    writeResults(hostdx2, hostdx4, mdx2, mdx4, hostSimP, w_swc, iter, size, nrow, outpath);
     t2 = high_resolution_clock::now();
     ms_double = t2 - t1;
     printf("%f seconds\n", ms_double.count()/1e3);
@@ -545,6 +548,8 @@ int main() {
     free(hostD4Swc);
     free(hostNewIndex);
     free(hostIndexSize);
+    free(mdx2);
+    free(mdx4);
     // free(hostAllData);
     return 0;
 }
