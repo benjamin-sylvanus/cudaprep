@@ -78,5 +78,5 @@ __device__ double3
  setNextPos(double3 nextpos,double3 A,double4 xi, double step);
 
 
- __host__ void
- writeResults(double * hostdx2, double * hostdx4, double * mdx2, double * mdx4, double * hostSimP, double * w_swc, int iter, int size, int nrow, std::string outpath);
+ __host__
+ void writeResults(double * hostdx2, double * hostdx4, double * hostSimP, double * w_swc, int iter, int size, std::string outpath);
