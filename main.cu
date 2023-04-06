@@ -80,9 +80,6 @@ __global__ void simulate(double *dx2, double *dx4, int *Bounds, curandStatePhilo
 
         // iterate over steps
         for (int i = 0; i < iter; i++) {
-
-          // printf("i: %d\tgid: %d\n",i,gid);
-
             if (flag == 0) {
                 // generate uniform randoms for step
                 xi = curand_uniform4_double(&localstate);
@@ -527,6 +524,7 @@ int main() {
     cudaFree(deviceNewIndex);
     cudaFree(deviceIndexSize);
     // cudaFree(deviceAllData);
+
     auto t2 = high_resolution_clock::now();
     duration<double, std::milli> ms_double = t2 - t1;
     printf("%f seconds\n", ms_double.count()/1e3);
@@ -551,5 +549,8 @@ int main() {
     free(mdx2);
     free(mdx4);
     // free(hostAllData);
+
+    fprintf("Host Data Free!\n");
+
     return 0;
 }

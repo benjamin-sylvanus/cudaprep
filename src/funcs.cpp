@@ -251,7 +251,6 @@ __host__ void writeResults(double * hostdx2, double * hostdx4, double * mdx2, do
 
 
   outFile = fopen(swcpath.c_str(),"wb");
-
   fwrite (w_swc,sizeof(double),nrow*4,outFile);
   fclose(outFile);
 
