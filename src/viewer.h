@@ -20,10 +20,11 @@ private:
     std::string command="-";
     std::string mods="-";
     std::string str="-";
+    int useColor = 0;
 
 public:
-
     viewer();
+    viewer(int c);
     void display(int option);
     void show(simulation sim);
     void showHelp();

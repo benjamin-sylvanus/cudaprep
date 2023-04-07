@@ -12,6 +12,7 @@
 #include <curand.h>
 #include <curand_kernel.h>
 #include <fstream>
+#include <sys/stat.h>
 
 __device__ bool swc2v(double3 nextpos, double4 child, double4 parent, double dist) {
     bool pos;
@@ -208,6 +209,28 @@ __host__ void writeResults(double * hostdx2, double * hostdx4, double * mdx2, do
 {
   // Check outdir exists
   // isdir()?  mkdir : ...
+
+  /**
+  * Check if Path exists
+
+  *
+  */
+  // Structure which would store the metadata
+  struct stat sb;
+
+  // Calls the function with path as argument
+// If the file/directory exists at the path returns 0
+  // If block executes if path exists
+  printf("Outpath: %s\n",outpath.c_str());
+  if (stat(outpath.c_str(), &sb) == 0)
+    printf("Valid Path\n");
+  else
+    if (mkdir(outpath.c_str(), 0777) == -1)
+      std::cerr << "Error :  " << std::strerror(errno) << std::endl;
+    else
+      std::cout << "Directory created\n";
+
+
 
   double t[iter];
   double tstep = hostSimP[8];

@@ -46,7 +46,7 @@ private:
 
 public:
     // explicit controller(simulation& sim);
-    explicit controller(std::string path);
+    controller(std::string path, int c);
     void start();
     void handleinput(std::string input,bool * b);
     void handlecommand(std::vector<std::string>  command, bool * b);

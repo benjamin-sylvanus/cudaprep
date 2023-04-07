@@ -52,11 +52,16 @@ std::map<std::string, std::string> colors{
 struct winsize w;
 
 
-void print_map(std::map<std::string, std::string> m) {
+void print_map(std::map<std::string, std::string> m, int useColor) {
     // show content:
     for (std::map<std::string, std::string>::iterator it = m.begin(); it != m.end(); ++it)
-        printf("%s%s%s ---> %s%s%s\n", colors["g"].c_str(), it->first.c_str(), colors["w"].c_str(), colors["b"].c_str(),
-               it->second.c_str(), colors["w"].c_str());
+
+        (useColor) ? printf("%s%s%s ---> %s%s%s\n", colors["g"].c_str(),
+                                it->first.c_str(), colors["w"].c_str(),
+                                colors["b"].c_str(),it->second.c_str(),
+                                colors["w"].c_str()) :
+                                printf("%s ---> %s\n", it->first.c_str(),
+                                it->second.c_str());
 }
 
 void viewer::display(int option) {
@@ -69,7 +74,10 @@ void viewer::show(simulation sim) {
     std::string temp = this->str;
     std::string value = "Configuration";
     temp.replace((temp.length() / 2) - (value.length() / 2), value.length(), value);
-    cout << colors["p"] << this->str << endl << temp << endl << this->str << colors["w"] << endl;
+    (this->useColor) ? cout << colors["p"] << this->str << endl
+                      << temp << endl << this->str << colors["w"] << endl :
+                      cout << this->str << endl << temp
+                      << endl << this-> str << endl;
     cout << "Particle_num: " << sim.getParticle_num() << endl;
     cout << "Step_num: " << sim.getStep_num() << endl;
     cout << "Vsize: " << sim.getVsize() << endl;
@@ -91,15 +99,28 @@ void viewer::welcome() {
     std::string temp = this->str;
     std::string value = "Welcome";
     temp.replace((temp.length() / 2) - (value.length() / 2), value.length(), value);
-    cout << colors["bb"] << this->str << endl << temp << endl << this->str << colors["w"] << endl;
+
+    (this->useColor) ? cout << colors["bb"] << this->str << endl << temp
+                            << endl << this->str << colors["w"] << endl :
+                            cout << this->str << endl << temp
+                            << endl << this->str << endl;
     showCommands();
 }
+viewer::viewer()
+{
+  ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+  this->command = "-h help\n-c commands\n-s show configuration\n-d <arg> show argument\n-<arg> <value> set argument to value\n-args show arguments";
+  this->help = "-c -a will show options for input.\nArguments require a parameter:\n\t<-np 10000> sets the particle number to 10000\n\nInputs can be chained:\n\t<-ns 2000 -np 1000> sets the particle number to 1000 and step number to 2000.\n\nFor additional information checkout the ReadMe or documentation on github.";
+  this->str.assign(w.ws_col, '-');
+  this->useColor = 1;
+}
 
-viewer::viewer() {
+viewer::viewer(int c) {
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
     this->command = "-h help\n-c commands\n-s show configuration\n-d <arg> show argument\n-<arg> <value> set argument to value\n-args show arguments";
     this->help = "-c -a will show options for input.\nArguments require a parameter:\n\t<-np 10000> sets the particle number to 10000\n\nInputs can be chained:\n\t<-ns 2000 -np 1000> sets the particle number to 1000 and step number to 2000.\n\nFor additional information checkout the ReadMe or documentation on github.";
     this->str.assign(w.ws_col, '-');
+    this->useColor = c;
 }
 
 
@@ -109,8 +130,8 @@ void viewer::showargs(std::map<std::string, std::string> args) {
     std::string temp = this->str;
     std::string value = "Args";
     temp.replace((temp.length() / 2) - (value.length() / 2), value.length(), value);
-    cout << colors["p"] << this->str << endl << temp << endl << this->str << colors["w"] << endl;
-    print_map(args);
+    (this->useColor) ? cout << colors["p"] << this->str << endl << temp << endl << this->str << colors["w"] << endl : cout << this->str << endl << temp << endl << this->str << endl;
+    print_map(args, this->useColor);
 }
 
 void viewer::showCommands() {
@@ -119,7 +140,8 @@ void viewer::showCommands() {
     std::string temp = this->str;
     std::string value = "Commands";
     temp.replace((temp.length() / 2) - (value.length() / 2), value.length(), value);
-    cout << colors["p"] << this->str << endl << temp << endl << this->str << colors["w"] << endl;
+    (this->useColor) ? cout << colors["p"] << this->str << endl << temp << endl << this->str << colors["w"] << endl :
+    cout << this->str << endl << temp << endl << this->str << endl;
     cout << command << endl;
 }
 
@@ -130,13 +152,16 @@ void viewer::showHelp() {
     std::string temp = this->str;
     std::string value = "Help";
     temp.replace((temp.length() / 2) - (value.length() / 2), value.length(), value);
-    cout << colors["p"] << this->str << endl << temp << endl << this->str << colors["w"] << endl;
+    (this->useColor) ? cout << colors["p"] << this->str << endl << temp << endl << this->str << colors["w"] << endl :
+    cout << this->str << endl << temp << endl << this->str << endl;
     cout << help << endl;
 }
 
 void viewer::AlertNoParameter(std::string target)
 {
-    //Use red to alert
-    cout << colors["y"] << str << colors["r"] << target << " requires additional parameters." << endl << colors["y"]
-    << str << endl << colors["w"] << endl;
+    // Use red to alert
+    (this->useColor) ? cout << colors["y"] << str << colors["r"] << target << " requires additional parameters."
+     << endl << colors["y"] << str << endl << colors["w"] << endl :
+    cout << str << target << " requires additional parameters." << endl << str << endl << endl;
+
 }

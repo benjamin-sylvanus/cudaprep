@@ -33,7 +33,7 @@ simulation::simulation(simreader reader) {
     this->scale = this->parameterdata[7];
     this->tstep = this->parameterdata[8];
     this->vsize = this->parameterdata[9];
-    this->resultPath = "/results";
+    this->resultPath = "results/";
 }
 
 simulation::simulation()

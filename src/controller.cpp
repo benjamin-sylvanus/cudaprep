@@ -30,7 +30,7 @@ std::vector<std::string> split(std::string s, std::string delimiter) {
     return res;
 }
 
-controller::controller(std::string path)
+controller::controller(std::string path, int c)
 {
 
   // Request Path?
@@ -39,7 +39,7 @@ controller::controller(std::string path)
   printf("Reading Files...\n");
   simulation sim(reader);
   this->sim = sim;
-  this->view = viewer();
+  this->view = viewer(c);
   this->commands = {"h","c","a"};
 
   std::map<std::string, Controls> map{
@@ -227,6 +227,52 @@ void controller::start() {
            break;
         }
     }
+
+    // calculate Memory required for operation
+    // hostBounds = (int *) malloc(3 * sizeof(int));
+    // hostdx2 = (double *) malloc(6 * iter * sizeof(double));
+    // hostdx4 = (double *) malloc(15 * iter * sizeof(double));
+    // hostSimP = (double *) malloc(10 * sizeof(double));
+    // hostD4Swc = (double4 *) malloc(nrow * sizeof(double4));
+    // hostNewLut = (int *) malloc(prod * sizeof(int));
+    // hostNewIndex = (int *) malloc(newindexsize * sizeof(int));
+    // hostIndexSize = (int *) malloc(3 * sizeof(int));
+    // mdx2 = (double *) malloc(6 * iter * sizeof(double));
+    // mdx4 = (double *) malloc(15 * iter * sizeof(double));
+    // hostAllData = (double *) malloc(3 * iter * size * sizeof(double));
+
+    // int HOST_MEM_USE;
+    // int *
+    // 3
+    // prod
+    // newindexsize
+    // 3
+
+    // double *
+    // 6 * iter
+    // 15 * iter
+    // 10
+    // 6 * iter
+    // 15 * iter
+    // 3 * iter * size
+
+    // double4 *
+    // nrow
+
+    // hostBounds = (int *) malloc(3 * sizeof(int));
+    // hostdx2 = (double *) malloc(6 * iter * sizeof(double));
+    // hostdx4 = (double *) malloc(15 * iter * sizeof(double));
+    // hostSimP = (double *) malloc(10 * sizeof(double));
+    // hostD4Swc = (double4 *) malloc(nrow * sizeof(double4));
+    // hostNewLut = (int *) malloc(prod * sizeof(int));
+    // hostNewIndex = (int *) malloc(newindexsize * sizeof(int));
+    // hostIndexSize = (int *) malloc(3 * sizeof(int));
+    // mdx2 = (double *) malloc(6 * iter * sizeof(double));
+    // mdx4 = (double *) malloc(15 * iter * sizeof(double));
+    // hostAllData = (double *) malloc(3 * iter * size * sizeof(double));
+
+
+
 }
 
 simulation controller::getSim()
