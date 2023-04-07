@@ -88,6 +88,9 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
         // todo figure out how to get parstate from init position function... requires a global parstate.
         parstate = make_int2(1, 1);
 
+        // parlut defines whether particle is within bounds of LUT
+        int parlut = 1;
+
         // iterate over steps
         for (int i = 0; i < iter; i++) {
 
@@ -115,9 +118,9 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 lower = make_int3(floorpos.x >= 0, floorpos.y >= 0, floorpos.z >= 0);
 
                 // position inside the bounds of volume -> state of next position true : false
-                parstate.y = (lower.x && lower.y && lower.z && upper.x && upper.y && upper.z) ? 1 : 0;
+                parlut = (lower.x && lower.y && lower.z && upper.x && upper.y && upper.z) ? 1 : 0;
 
-                if (parstate.y == 0) {
+                if (parlut == 0) {
                     // do something
                     // reflection
                     int3 aob;
@@ -152,9 +155,9 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                     lower = make_int3(floorpos.x >= 0, floorpos.y >= 0, floorpos.z >= 0);
 
                     // position inside the bounds of volume -> state of next position true : false
-                    parstate.y = (lower.x && lower.y && lower.z && upper.x && upper.y && upper.z) ? 1 : 0;
+                    parlut = (lower.x && lower.y && lower.z && upper.x && upper.y && upper.z) ? 1 : 0;
 
-                    if (parstate.y == 0) {
+                    if (parlut == 0) {
                         printf("X: %d\tY: %dZ\t: %d\tResolved::::%d\n", aob.x, aob.y, aob.z, parstate.y);
                     }
 
@@ -162,72 +165,77 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
 
                 // extract value of lookup @ index
 
-                // checkme: do we need a conditional here?
-                if (parstate.y) {
-                    // reset particle state for next conditionals
-                    parstate.y = 0;
+                // if parstate.y == 0 then we failed to reflect the particle back into the volume.
+                // throw an error and exit the simulation
+                if (parlut == 0) {
+                    printf("Particle %d failed to reflect back into the volume. Exiting simulation.\n", gid);
+                    exit(1);
+                }
 
-                    // scuffed sub2ind function
-                    int id_test = s2i(floorpos, b_int3);
+                // reset particle state for next conditionals
+                parstate.y = 0; // checkme: is this necessary or valid?
 
-                    // extract lookup table value
-                    int test_lutvalue = nlut[id_test];
+                // sub2ind
+                int id_test = s2i(floorpos, b_int3);
 
-                    // child parent indicies
-                    int2 vindex;
+                // extract lookup table value
+                int test_lutvalue = nlut[id_test];
 
-                    // parent swc values
-                    double4 parent;
+                // child parent indicies
+                int2 vindex;
 
-                    // child swc values
-                    double4 child;
+                // parent swc values
+                double4 parent;
 
-                    // distance^2 from child to parent
-                    double dist2;
+                // child swc values
+                double4 child;
 
-                    // for each connection check if particle inside
-                    for (int page = 0; page < i_int3.z; page++) {
+                // distance^2 from child to parent
+                double dist2;
 
-                        // create a subscript indices
-                        int3 c_new = make_int3(test_lutvalue, 0, page);
-                        int3 p_new = make_int3(test_lutvalue, 1, page);
+                // for each connection check if particle inside
+                for (int page = 0; page < i_int3.z; page++) {
 
-                        // convert subscripted index to linear index and get value from Index Array
-                        vindex.x = NewIndex[s2i(c_new, i_int3)] - 1;
-                        vindex.y = NewIndex[s2i(p_new, i_int3)] - 1;
+                    // create a subscript indices
+                    int3 c_new = make_int3(test_lutvalue, 0, page);
+                    int3 p_new = make_int3(test_lutvalue, 1, page);
 
-                        if ((vindex.x) != -1) {
-                            //extract child parent values from swc
-                            child = d4swc[vindex.x];
-                            parent = d4swc[vindex.y];
+                    // convert subscripted index to linear index and get value from Index Array
+                    vindex.x = NewIndex[s2i(c_new, i_int3)] - 1;
+                    vindex.y = NewIndex[s2i(p_new, i_int3)] - 1;
 
-                            // calculate euclidean distance
-                            dist2 = pow(parent.x - child.x, 2) + pow(parent.y - child.y, 2) +
-                                    pow(parent.z - child.z, 2);
+                    if ((vindex.x) != -1) {
+                        //extract child parent values from swc
+                        child = d4swc[vindex.x];
+                        parent = d4swc[vindex.y];
 
-                            // determine whether particle is inside this connection
-                            bool inside = swc2v(nextpos, child, parent, dist2);
+                        // calculate euclidean distance
+                        dist2 = pow(parent.x - child.x, 2) + pow(parent.y - child.y, 2) +
+                                pow(parent.z - child.z, 2);
 
-                            // if it is inside the connection we don't need to check the remaining.
-                            if (inside) {
-                                // update the particles state
-                                parstate.y = 1;
+                        // determine whether particle is inside this connection
+                        bool inside = swc2v(nextpos, child, parent, dist2);
 
-                                // end for p loop
-                                page = i_int3.z;
-                            }
+                        // if it is inside the connection we don't need to check the remaining.
+                        if (inside) {
+                            // update the particles state
+                            parstate.y = 1;
+
+                            // end for p loop
+                            page = i_int3.z;
                         }
+                    }
 
                         // if the value of the index array is -1 we have checked all pairs for this particle.
                         // checkme: how often does this happen?
-                        else {
-                             printf("No Cons Found: Particle %d \t Step %d\n",gid,step);
-                            // end for p loop
-                            page = i_int3.z;
-                            parstate.y = 0;
-                        }
+                    else {
+                        printf("No Cons Found: Particle %d \t Step %d\n", gid, step);
+                        // end for p loop
+                        page = i_int3.z;
+                        parstate.y = 0;
                     }
                 }
+
 
                 // determine if step executes
                 completes = xi.w < perm_prob;
@@ -356,24 +364,11 @@ int main(int argc, char *argv[]) {
     control.start();
     system("clear");
 
-
     double simparam[10];
     simulation sim = control.getSim();
     // path = sim.getResultPath();
     size = sim.getParticle_num();
     iter = sim.getStep_num();
-    /**
-     <li> particle_num = SimulationParams[0] </li>
-     <li> step_num = SimulationParams[1] </li>
-     <li> step_size = SimulationParams[2] </li>
-     <li> perm_prob = SimulationParams[3] </li>
-     <li> init_in = SimulationParams[4] </li>
-     <li> D0 = SimulationParams[5] </li>
-     <li> d = SimulationParams[6] </li>
-     <li> scale = SimulationParams[7] </li>
-     <li> tstep = SimulationParams[8] </li>
-     <li> vsize = SimulationParams[9] </li>
-     */
     std::vector<double> simulationparams = sim.getParameterdata();
 
     for (int i = 0; i < 10; i++) {
@@ -391,22 +386,34 @@ int main(int argc, char *argv[]) {
     int prod = (int) (boundx * boundy * boundz);
     std::vector<double> r_swc = sim.getSwc();
     int nrow = r_swc.size() / 6;
-    /**
-     * @brief Indexing SWC ARRAY
-     * index + (dx*0:5);
-     * row+(nrow*col)
-     * Example: nrow = 10; get all elements from row 1;
-     * swc[1,0:5] ---->
-     * <li> swc(1,0) = swc[1+10*0];</li>
-     * <li> swc(1,1) = swc[1+10*1];</li>
-     * <li> swc(1,2) = swc[1+10*2];</li>
-     * <li> swc(1,3) = swc[1+10*3];</li>
-     * <li> swc(1,4) = swc[1+10*4];</li>
-     * <li> swc(1,5) = swc[1+10*5];</li>
-     */
+
 
     //old comments
     {
+        /**
+         * @brief Simulation Params Array
+         * <li> particle_num = SimulationParams[0] </li>
+         * <li> step_num = SimulationParams[1] </li>
+         * <li> step_size = SimulationParams[2] </li>
+         * <li> perm_prob = SimulationParams[3] </li>
+         * <li> init_in = SimulationParams[4] </li>
+         * <li> D0 = SimulationParams[5] </li>
+         * <li> d = SimulationParams[6] </li>
+         * <li> scale = SimulationParams[7] </li>
+         * <li> tstep = SimulationParams[8] </li>
+         * <li> vsize = SimulationParams[9] </li>
+         * @brief INDEXING SWC ARRAY
+         * index + (dx*0:5);
+         * row+(nrow*col)
+         * Example: nrow = 10; get all elements from row 1;
+         * swc[1,0:5] ---->
+         * <li> swc(1,0) = swc[1+10*0];</li>
+         * <li> swc(1,1) = swc[1+10*1];</li>
+         * <li> swc(1,2) = swc[1+10*2];</li>
+         * <li> swc(1,3) = swc[1+10*3];</li>
+         * <li> swc(1,4) = swc[1+10*4];</li>
+         * <li> swc(1,5) = swc[1+10*5];</li>
+         */
         //we only need the x y z r    float milliseconds = 0; of our swc array.
         // stride + bx * (by * y + z) + x
         // int id0 = 0 + (boundx) * ((boundy) * 2 + 2) + 3;
@@ -627,7 +634,7 @@ int main(int argc, char *argv[]) {
     cudaEventSynchronize(stop_c);
     cudaEventElapsedTime(&milliseconds, start_c, stop_c);
     end = clock();
-    printf("kernel took %f seconds\n", milliseconds / 1e3);
+    printf("Kernel took %f seconds\n", milliseconds / 1e3);
     auto t1 = high_resolution_clock::now();
 
     // Free Device Memory
