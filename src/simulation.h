@@ -31,10 +31,11 @@ private:
     double scale;
     double vsize;
     std::string resultPath;
+    int SaveAll = 1;
 
 public:
     // Constructors
-    simulation(simreader reader);
+    simulation(simreader reader, std::string outpath);
     simulation();
 
 
@@ -56,7 +57,8 @@ public:
     void setbounds();
     void setParameterdata();
     void setArraydims();
-    void setResultPath(std::string genpath,std::string path);
+    void setResultPath(std::string path);
+    void setSaveAll(int value);
 
     // Accessors
     double getScale() const;
@@ -69,7 +71,7 @@ public:
     double getD0() const;
     double getD() const;
     double getTstep() const;
-    std::string getResultPath() const; 
+    std::string getResultPath() const;
     std::vector<double> getSwc();
     std::vector<std::uint64_t> getLut();
     std::vector<std::uint64_t> getIndex();
@@ -77,6 +79,7 @@ public:
     std::vector<std::uint64_t> getbounds();
     std::vector<double> getParameterdata();
     std::vector<std::vector<uint64_t>> getArraydims();
+    int getSaveAll() const;
 
 
 
@@ -85,18 +88,12 @@ public:
      */
 
 
-    double * nextPosition(double * nexts) const;
-
-
-
-
     /**Enquiry:
      * Is Simulation and Is Simulation Valid;
      */
 
     // Destructor
     ~simulation() = default;
-
 
 };
 

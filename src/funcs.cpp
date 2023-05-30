@@ -16,16 +16,25 @@
 
 __device__ bool swc2v(double3 nextpos, double4 child, double4 parent, double dist) {
     bool pos;
+    double cr2;
+    double pr2;
     if (dist == 0) {
-        dist = 0.000000000000000001;
+      cr2 = pow(child.w, 2);
+      pr2 = pow(parent.w, 2);
+      pos = (pow(nextpos.x - child.x, 2) + pow(nextpos.y - child.y, 2) + pow(nextpos.z - child.z, 2)) < cr2 ||
+                   (pow(nextpos.x - parent.x, 2) + pow(nextpos.y - parent.y, 2) + pow(nextpos.z - parent.z, 2)) < pr2;
+        // dist = 0.000000000000000001;
     }
+    else
+    {
     double t = ((nextpos.x - child.x) * (parent.x - child.x) + (nextpos.y - child.y) * (parent.y - child.y) +
                 (nextpos.z - child.z) * (parent.z - child.z)) / dist;
+    // printf("t: %f\n", t);
     double x = child.x + (parent.x - child.x) * t;
     double y = child.y + (parent.y - child.y) * t;
     double z = child.z + (parent.z - child.z) * t;
-    double cr2 = pow(child.w, 2);
-    double pr2 = pow(parent.w, 2);
+    cr2 = pow(child.w, 2);
+    pr2 = pow(parent.w, 2);
     double L = sqrt(pow(parent.x-child.x,2) + pow(parent.y-child.y,2) + pow(parent.z-child.z,2));
     double sin_theta = fabs(child.w - parent.w)/L;
     double cos_theta = sqrt(1-pow(sin_theta,2));
@@ -43,6 +52,7 @@ __device__ bool swc2v(double3 nextpos, double4 child, double4 parent, double dis
       pos = (pow(nextpos.x - child.x, 2) + pow(nextpos.y - child.y, 2) + pow(nextpos.z - child.z, 2)) < cr2 ||
              (pow(nextpos.x - parent.x, 2) + pow(nextpos.y - parent.y, 2) + pow(nextpos.z - parent.z, 2)) < pr2;
     }
+  }
     return pos;
 }
 
@@ -171,29 +181,36 @@ __device__ double3 initPosition(int gid, double *dx2, int *Bounds, curandStatePh
     return A;
 }
 
-__device__ void diffusionTensor(double3 A, double3 xnot, double vsize, double *dx2, double * savedata, double3 d2, int i, int gid, int iter, int size) {
+__device__ void diffusionTensor(double3 * A, double3 * xnot, double vsize, double * dx2, double * dx4, double3 * d2, int i, int gid, int iter, int size) {
 
-    d2.x = fabs((A.x - xnot.x) * vsize);
-    d2.y = fabs((A.y - xnot.y) * vsize);
-    d2.z = fabs((A.z - xnot.z) * vsize);
+    d2->x = fabs((A->x - xnot->x) * vsize);
+    d2->y = fabs((A->y - xnot->y) * vsize);
+    d2->z = fabs((A->z - xnot->z) * vsize);
 
-    // diffusion tensor
-    atomicAdd(&dx2[6 * i + 0], d2.x * d2.x);
-    atomicAdd(&dx2[6 * i + 1], d2.x * d2.y);
-    atomicAdd(&dx2[6 * i + 2], d2.x * d2.z);
-    atomicAdd(&dx2[6 * i + 3], d2.y * d2.y);
-    atomicAdd(&dx2[6 * i + 4], d2.y * d2.z);
-    atomicAdd(&dx2[6 * i + 5], d2.z * d2.z);
+    // Diffusion tensor
+    atomicAdd(&dx2[6 * i + 0], d2->x * d2->x);
+    atomicAdd(&dx2[6 * i + 1], d2->x * d2->y);
+    atomicAdd(&dx2[6 * i + 2], d2->x * d2->z);
+    atomicAdd(&dx2[6 * i + 3], d2->y * d2->y);
+    atomicAdd(&dx2[6 * i + 4], d2->y * d2->z);
+    atomicAdd(&dx2[6 * i + 5], d2->z * d2->z);
 
-    int3 dix = make_int3(iter, size, 3);
-    int3 did[4];
-    did[0] = make_int3(0, i, gid);
-    did[1] = make_int3(1, i, gid);
-    did[2] = make_int3(2, i, gid);
-    did[3] = make_int3(s2i(did[0], dix), s2i(did[1], dix), s2i(did[2], dix));
-    savedata[did[3].x] = A.x;
-    savedata[did[3].y] = A.y;
-    savedata[did[3].z] = A.z;
+    // Kurtosis Tensor
+    atomicAdd(&dx4[15 * i + 0], d2->x * d2->x * d2->x * d2->x);
+    atomicAdd(&dx4[15 * i + 1], d2->x * d2->x * d2->x * d2->y);
+    atomicAdd(&dx4[15 * i + 2], d2->x * d2->x * d2->x * d2->z);
+    atomicAdd(&dx4[15 * i + 3], d2->x * d2->x * d2->y * d2->y);
+    atomicAdd(&dx4[15 * i + 4], d2->x * d2->x * d2->y * d2->z);
+    atomicAdd(&dx4[15 * i + 5], d2->x * d2->x * d2->z * d2->z);
+    atomicAdd(&dx4[15 * i + 6], d2->x * d2->y * d2->y * d2->y);
+    atomicAdd(&dx4[15 * i + 7], d2->x * d2->y * d2->y * d2->z);
+    atomicAdd(&dx4[15 * i + 8], d2->x * d2->y * d2->z * d2->z);
+    atomicAdd(&dx4[15 * i + 9], d2->x * d2->z * d2->z * d2->z);
+    atomicAdd(&dx4[15 * i + 10], d2->y * d2->y * d2->y * d2->y);
+    atomicAdd(&dx4[15 * i + 11], d2->y * d2->y * d2->y * d2->z);
+    atomicAdd(&dx4[15 * i + 12], d2->y * d2->y * d2->z * d2->z);
+    atomicAdd(&dx4[15 * i + 13], d2->y * d2->z * d2->z * d2->z);
+    atomicAdd(&dx4[15 * i + 14], d2->z * d2->z * d2->z * d2->z);
 }
 
 
@@ -264,13 +281,13 @@ __host__ void writeResults(double * hostdx2, double * hostdx4, double * mdx2, do
   // fwrite (hostAllData,sizeof(double),iter*size*3,outFile);
   // fclose (outFile);
 
-  std::string dx2Path = outpath; dx2Path.append("dx2.bin");
-  std::string mdx2Path = outpath; mdx2Path.append("mdx2.bin");
-  std::string dx4Path = outpath; dx4Path.append("dx4.bin");
-  std::string mdx4Path = outpath; mdx4Path.append("mdx4.bin");
-  std::string swcpath = outpath; swcpath.append("swc.bin");
-  std::string cfgpath = outpath; cfgpath.append("outcfg.bin");
-  std::string tpath = outpath; tpath.append("t.bin");
+  std::string dx2Path = outpath; dx2Path.append("/dx2.bin");
+  std::string mdx2Path = outpath; mdx2Path.append("/mdx2.bin");
+  std::string dx4Path = outpath; dx4Path.append("/dx4.bin");
+  std::string mdx4Path = outpath; mdx4Path.append("/mdx4.bin");
+  std::string swcpath = outpath; swcpath.append("/swc.bin");
+  std::string cfgpath = outpath; cfgpath.append("/outcfg.bin");
+  std::string tpath = outpath; tpath.append("/t.bin");
 
 
   outFile = fopen(swcpath.c_str(),"wb");
