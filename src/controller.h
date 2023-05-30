@@ -13,7 +13,9 @@
 #include "viewer.h"
 #include <map>
 
-enum class Controls : int { Invalid,Commands,
+enum class Controls : int {
+Invalid,
+Commands,
 Help,
 Args,
 Show,
@@ -29,7 +31,8 @@ NStep,
 NPar,
 Quit,
 InPath,
-OutPath
+OutPath,
+SaveAll
 };
 
 class controller {
@@ -37,7 +40,8 @@ private:
 
     simulation sim;
     viewer view;
-    std::string path;
+    std::string pathIn;
+    std::string pathOut;
     std::vector<std::string> commands;
     std::vector<std::string> args;
     std::map<std::string, Controls> map;
@@ -45,13 +49,18 @@ private:
 
 
 public:
+    controller();
     // explicit controller(simulation& sim);
-    explicit controller(std::string path);
+    void Setup(std::string InPath,std::string OutPath, int c);
+    // constructor with main functions argc and argv
+    void Setup(int argc, char **argv, int c);
+    void start(std::string buf, bool   b);
     void start();
     void handleinput(std::string input,bool * b);
     void handlecommand(std::vector<std::string>  command, bool * b);
     simulation getSim();
     void setSim(std::string path);
+    void setPathOut(std::string path);
 };
 
 

@@ -61,6 +61,4 @@ std::vector<double> simreader::readconstants()
 {
     std::string path =  this->getpath().append("/constants.bin");
     return std::vector<double>();
-
-
 }

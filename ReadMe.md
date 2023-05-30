@@ -25,3 +25,10 @@ Implement c++ lookup table and swc pipeline to remove matlab component of pipeli
 or
 
 Write shell scripts to run cpp from matlab command line.
+
+
+boolean	  1 byte
+char	    1 byte
+int	      2 or 4 bytes
+float	    4 bytes
+double	  8 bytes

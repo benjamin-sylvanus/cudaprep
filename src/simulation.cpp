@@ -15,7 +15,7 @@
 #pragma ide diagnostic ignored "OCUnusedGlobalDeclarationInspection"
 
 
-simulation::simulation(simreader reader) {
+simulation::simulation(simreader reader, std::string outpath) {
     this->swc = reader.read<double>("/swc.bin");
     this->parameterdata = reader.read<double>("/constants.bin");
     this->index = reader.read<std::uint64_t>("/index.bin");
@@ -33,7 +33,7 @@ simulation::simulation(simreader reader) {
     this->scale = this->parameterdata[7];
     this->tstep = this->parameterdata[8];
     this->vsize = this->parameterdata[9];
-    this->resultPath = "/results";
+    this->resultPath = outpath;
 }
 
 simulation::simulation()
@@ -78,6 +78,8 @@ std::vector <std::uint64_t> simulation::getbounds() { return this->bounds; }
 std::vector<double> simulation::getParameterdata() { return this->parameterdata; }
 
 std::vector <std::vector<uint64_t>> simulation::getArraydims() { return this->arraydims; }
+
+int simulation::getSaveAll() const { return this->SaveAll; }
 
 
 
@@ -181,28 +183,16 @@ void simulation::setArraydims() {
     printf("Unsupported\n");
 }
 
-void simulation::setResultPath(std::string genpath,std::string path)
+void simulation::setResultPath(std::string path)
 {
-  printf("Root:\t%s\nResultPath: \t%s -> %s\n",genpath.c_str(), this->resultPath.c_str(), path.c_str());
+  printf("ResultPath: \t%s -> %s\n",this->resultPath.c_str(), path.c_str());
   this->resultPath = path;
 }
 
-double *simulation::nextPosition(double *nexts) const {
-    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-    std::mt19937 generator(seed);
-    std::uniform_real_distribution<double> uniform01(0.0, 1.0);
-
-    // generate N random numbers
-    int N = int(particle_num);
-    for (int i = 0; i < N; i++) {
-        double theta = 2 * M_PI * uniform01(generator);
-        double phi = acos(1 - 2 * uniform01(generator));
-        nexts[3 * i + 0] = sin(phi) * cos(theta);
-        nexts[3 * i + 1] = sin(phi) * sin(theta);
-        nexts[3 * i + 2] = cos(phi);
-    }
-
-    return nexts;
+void simulation::setSaveAll(int value)
+{
+ printf("Save All Data: %d -> %d\n", this->SaveAll, value);
+  this->SaveAll = value;
 }
 
 #pragma clang diagnostic pop
