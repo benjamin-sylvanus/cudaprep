@@ -30,15 +30,22 @@ std::vector<std::string> split(std::string s, std::string delimiter) {
     return res;
 }
 
-controller::controller(std::string path, int c)
+controller::controller()
+{
+
+}
+
+void controller::Setup(std::string inpath,std::string outpath, int c)
 {
 
   // Request Path?
-  this->path = path;
-  simreader reader(&this->path);
+  this->pathIn = inpath;
+  this->pathOut = outpath;
+  simreader reader(&this->pathIn);
   printf("Reading Files...\n");
-  simulation sim(reader);
+  simulation sim(reader, pathOut);
   this->sim = sim;
+  this->view = viewer(c);
   this->view = viewer(c);
   this->commands = {"h","c","a"};
 
@@ -61,7 +68,8 @@ controller::controller(std::string path, int c)
   {"Q", Controls::Quit},
   {"done",Controls::Quit},
   {"p", Controls::InPath},
-  {"o", Controls::OutPath}};
+  {"o", Controls::OutPath},
+  {"sa", Controls::SaveAll}};
 
   std::map<std::string, std::string> targets{
   {"c", "Controls::Commands"},
@@ -82,7 +90,8 @@ controller::controller(std::string path, int c)
   {"Q","Controls::Quit"},
   {"done", "Controls::Quit"},
   {"p", "Controls::InPath"},
-  {"o", "Controls::OutPath"}};
+  {"o", "Controls::OutPath"},
+  {"sa", "Controls::OutPath"}};
 
   this->map = map;
   this->targets = targets;
@@ -99,6 +108,80 @@ controller::controller(std::string path, int c)
       scale
       vsize
   */
+}
+
+void controller::Setup(int argc, char ** argv, int c)
+{
+
+
+
+    std::map<std::string, Controls> map{
+            {"c", Controls::Commands},
+            {"h", Controls::Help},
+            {"a", Controls::Args},
+            {"s", Controls::Show},
+            {"ss",Controls::StepSize},
+            {"pp",Controls::PermeationProbability},
+            {"d0",Controls::IntrinsicDiffusivity},
+            {"ii",Controls::Init_in},
+            {"d", Controls::Distance},
+            {"ts",Controls::TimeStep},
+            {"sc",Controls::Scale},
+            {"vs",Controls::VoxelSize},
+            {"ns",Controls::NStep},
+            {"np",Controls::NPar},
+            {"q", Controls::Quit},
+            {"Q", Controls::Quit},
+            {"done",Controls::Quit},
+            {"p", Controls::InPath},
+            {"o", Controls::OutPath},
+            {"sa", Controls::SaveAll}};
+
+    std::map<std::string, std::string> targets{
+            {"c", "Controls::Commands"},
+            {"h", "Controls::Help"},
+            {"a", "Controls::Args"},
+            {"s", "Controls::Show"},
+            {"ss","Controls::StepSize"},
+            {"pp","Controls::PermeationProbability"},
+            {"d0","Controls::IntrinsicDiffusivity"},
+            {"ii","Controls::Init_in"},
+            {"d", "Controls::Distance"},
+            {"ts","Controls::TimeStep"},
+            {"sc","Controls::Scale"},
+            {"vs","Controls::VoxelSize"},
+            {"ns","Controls::NStep"},
+            {"np","Controls::NPar"},
+            {"q","Controls::Quit"},
+            {"Q","Controls::Quit"},
+            {"done", "Controls::Quit"},
+            {"p", "Controls::InPath"},
+            {"o", "Controls::OutPath"},
+            {"sa", "Controls::OutPath"}};
+
+    this->map = map;
+    this->targets = targets;
+    this->args = {"ss", "pp", "d0", "ii", "d", "ts", "pd", "ad", "s", "vs", "ns","np"};
+    this->view = viewer(c);
+    this->commands = {"h","c","a"};
+
+    // Parse command line arguments form -arg value pairs
+    // construct a string first
+    std::string buf;
+    for(int i = 0; i < argc; i++)
+    {
+        buf += argv[i];
+        buf += " ";
+    }
+
+    // Parse input
+    bool b = false;
+    this->start(buf,b);
+    if (this->pathIn.empty()||this->pathOut.empty())
+    {
+        printf("Please Configure InPath and OutPath\n");
+        exit(0);
+    }
 }
 
 
@@ -185,8 +268,13 @@ void controller::handlecommand(std::vector<string> sub, bool * b)
         break;
 
       case Controls::OutPath:
-        (sub.size() < 2) ? view.AlertNoParameter(target) : this->sim.setResultPath(this->path, sub[1]);
+        (sub.size() < 2) ? view.AlertNoParameter(target) : this->setPathOut(sub[1]);
         break;
+
+      case Controls::SaveAll:
+        (sub.size() < 2) ? view.AlertNoParameter(target) : this->sim.setSaveAll(std::stoi(sub[1]));
+        break;
+
 
       default:
         printf("Invalid Argument\n");
@@ -214,6 +302,24 @@ void controller::handleinput(std::string buf, bool * b)
   }
 }
 
+void controller::start(std::string buf, bool b) {
+    view.welcome();
+    handleinput(buf,&b);
+    if (!b) {
+      while (true)
+      {
+          string buff;
+          getline(cin,buff);
+          handleinput(buff,&b);
+          if(b)
+          {
+             break;
+          }
+    }
+  }
+}
+
+
 void controller::start() {
     view.welcome();
     bool b = false;
@@ -227,6 +333,7 @@ void controller::start() {
            break;
         }
     }
+
 
     // calculate Memory required for operation
     // hostBounds = (int *) malloc(3 * sizeof(int));
@@ -282,8 +389,15 @@ simulation controller::getSim()
 
 void controller::setSim(string path)
 {
+  this->pathIn = path;
   simreader reader(&path);
   printf("Reading Files...\n");
-  simulation sim(reader);
+  simulation sim(reader, pathOut);
   this->sim = sim;
+}
+
+void controller::setPathOut(string outpath)
+{
+  this->pathOut = outpath;
+  this->sim.setResultPath(outpath);
 }

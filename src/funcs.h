@@ -65,7 +65,7 @@ __device__ void
  * @param d2 particle displacement (scaled)
  * @param i step
  */
-diffusionTensor(double3 A, double3 xnot, double vsize, double *dx2, double *savedata, double3 d2, int i, int gid, int iter, int size);
+diffusionTensor(double3 * A, double3 * xnot, double vsize, double *dx2, double * dx4, double3 * d2, int i, int gid, int iter, int size);
 
 __device__ double3
 /**

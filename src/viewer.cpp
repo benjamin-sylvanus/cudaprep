@@ -89,6 +89,7 @@ void viewer::show(simulation sim) {
     cout << "D: " << sim.getD() << endl;
     cout << "Tstep: " << sim.getTstep() << endl;
     cout << "Path: " << sim.getResultPath() << endl;
+    cout << "Save All" << sim.getSaveAll() << endl; 
 
 }
 
