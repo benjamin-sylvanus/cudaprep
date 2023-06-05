@@ -173,6 +173,8 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 // position inside the bounds of volume -> state of next position true : false
                 parlut = (lower.x && lower.y && lower.z && upper.x && upper.y && upper.z) ? 1 : 0;
 
+            
+
                 if (parlut == 0) {
                     // do something
                     // reflection
