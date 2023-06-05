@@ -37,7 +37,7 @@ __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long se
 }
 
 
-__device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos, int* NewIndex, double4* d4swc) {
+__device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos, int *NewIndex, double4 *d4swc) {
     int3 vindex;
     double4 child, parent;
     double dist2;
@@ -71,14 +71,98 @@ __device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos
                 return true;
             }
         }
-        // if the value of the index array is -1 we have checked all pairs for this particle.
-        // checkme: how often does this happen?
+            // if the value of the index array is -1 we have checked all pairs for this particle.
+            // checkme: how often does this happen?
         else {
             // end for p loop
             return false;
         }
     }
     return false;
+}
+
+// validCoord(nextpos, b_int3, &parlut, &upper, &lower, &floorpos);
+__device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &upper, int3 &lower, int3 &floorpos)
+{
+    while(true)
+    {
+        // convert the current position to integer
+        floorpos = make_int3((int) nextpos.x, (int) nextpos.y, (int) nextpos.z);
+
+        // upper bounds of lookup table
+        upper = make_int3(floorpos.x < b_int3.x, floorpos.y < b_int3.y, floorpos.z < b_int3.z);
+
+        // lower bounds of lookup table
+        lower = make_int3(floorpos.x >= 0, floorpos.y >= 0, floorpos.z >= 0);
+
+        int3 normal;
+
+        if (lower.x)
+        {
+            plane = X_LOW;
+            pointOnPlane = double3(0, nextpos.y, nextpos.z);
+            normal = double3(1, 0, 0);
+        }
+        else if (upper.x)
+        {
+            plane = X_HIGH;
+            pointOnPlane = double3(b_int3.x, nextpos.y, nextpos.z);
+            normal = double3(-1, 0, 0);
+        }
+        else if (lower.y)
+        {
+            plane = Y_LOW;
+            pointOnPlane = double3(nextpos.x, 0, nextpos.z);
+            normal = double3(0, 1, 0);
+        }
+        else if (upper.y)
+        {
+            plane = Y_HIGH;
+            pointOnPlane = double3(nextpos.x, b_int3.y, nextpos.z);
+            normal = double3(0, -1, 0);
+        }
+        else if (lower.z)
+        {
+            plane = Z_LOW;
+            pointOnPlane = double3(nextpos.x, nextpos.y, 0);
+            normal = double3(0, 0, 1);
+
+        }
+        else if (upper.z)
+        {
+            plane = Z_HIGH;
+            pointOnPlane = double3(nextpos.x, nextpos.y, b_int3.z);
+            normal = double3(0, 0, -1);
+        }
+        else
+        {
+
+            // this should break the loop.....
+            return;
+        }
+
+        // Calculate D  (Ax + By + Cz + D = 0)
+        float D = -normal.dot(pointOnPlane);
+
+        double3 intersectionPoint;
+        double3 d = nextpos - pos;
+        float t1 = (-(normal.dot(start) + D)) / normal.dot(d);
+        intersectionPoint = start + d * t1;
+
+        double3 reflectionVector = pos - intersectionPoint;
+        reflectionVector = reflectionVector - normal * (2 * reflectionVector.dot(normal));
+        // Update the particle's position
+        pos = intersectionPoint;
+        nextpos = intersectionPoint + reflectionVector;
+
+        // Print some info
+         printf("Reflection vector: %f %f %f\n", reflectionVector.x, reflectionVector.y, reflectionVector.z);
+         printf("Intersection point: %f %f %f\n", intersectionPoint.x, intersectionPoint.y, intersectionPoint.z);
+         printf("Normal: %f %f %f\n", normal.x, normal.y, normal.z);
+         printf("D: %f\n", D);
+         printf("t1: %f\n", t1);
+         printf("Particle position: %f %f %f\n", pos.x, pos.y, pos.z);
+    }
 }
 
 
@@ -115,12 +199,12 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
         /////////////////////
         // signal variables
         {
-        /*
+            /*
 
-        double s0 = 0; // Signal weighted by T2 relaxation
-        double t[Nc_max] = {0}; // The time staying in compartments
+            double s0 = 0; // Signal weighted by T2 relaxation
+            double t[Nc_max] = {0}; // The time staying in compartments
 
-        */
+            */
         }
         ////////////////////
 
@@ -161,6 +245,9 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 nextpos.y = A.y + (step * sin_phi * sin(theta));
                 nextpos.z = A.z + (step * cos_phi);
 
+                // check coordinate validity
+                validCoord(&nextpos, &A, &b_int3, &upper, &lower, &floorpos);
+
                 // floor of next position -> check voxels
                 floorpos = make_int3((int) nextpos.x, (int) nextpos.y, (int) nextpos.z);
 
@@ -173,7 +260,6 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 // position inside the bounds of volume -> state of next position true : false
                 parlut = (lower.x && lower.y && lower.z && upper.x && upper.y && upper.z) ? 1 : 0;
 
-            
 
                 if (parlut == 0) {
                     // do something
@@ -252,51 +338,50 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
 
                 // pre function definition
                 {
-                  /*
-                    for (int page = 0; page < i_int3.z; page++) {
+                    /*
+                      for (int page = 0; page < i_int3.z; page++) {
 
-                      // create a subscript indices
-                      int3 c_new = make_int3(test_lutvalue, 0, page);
-                      int3 p_new = make_int3(test_lutvalue, 1, page);
+                        // create a subscript indices
+                        int3 c_new = make_int3(test_lutvalue, 0, page);
+                        int3 p_new = make_int3(test_lutvalue, 1, page);
 
-                      // convert subscripted index to linear index and get value from Index Array
-                      vindex.x = NewIndex[s2i(c_new, i_int3)] - 1;
-                      vindex.y = NewIndex[s2i(p_new, i_int3)] - 1;
+                        // convert subscripted index to linear index and get value from Index Array
+                        vindex.x = NewIndex[s2i(c_new, i_int3)] - 1;
+                        vindex.y = NewIndex[s2i(p_new, i_int3)] - 1;
 
-                      if ((vindex.x) != -1) {
-                          //extract child parent values from swc
-                          child = d4swc[vindex.x];
-                          parent = d4swc[vindex.y];
+                        if ((vindex.x) != -1) {
+                            //extract child parent values from swc
+                            child = d4swc[vindex.x];
+                            parent = d4swc[vindex.y];
 
-                          // calculate euclidean distance
-                          dist2 = pow(parent.x - child.x, 2) + pow(parent.y - child.y, 2) +
-                                  pow(parent.z - child.z, 2);
+                            // calculate euclidean distance
+                            dist2 = pow(parent.x - child.x, 2) + pow(parent.y - child.y, 2) +
+                                    pow(parent.z - child.z, 2);
 
-                          // determine whether particle is inside this connection
-                          bool inside = swc2v(nextpos, child, parent, dist2);
+                            // determine whether particle is inside this connection
+                            bool inside = swc2v(nextpos, child, parent, dist2);
 
-                          // if it is inside the connection we don't need to check the remaining.
-                          if (inside) {
-                              // update the particles state
-                              parstate.y = 1;
+                            // if it is inside the connection we don't need to check the remaining.
+                            if (inside) {
+                                // update the particles state
+                                parstate.y = 1;
 
-                              // end for p loop
-                              page = i_int3.z;
-                          }
-                      }
+                                // end for p loop
+                                page = i_int3.z;
+                            }
+                        }
 
-                          // if the value of the index array is -1 we have checked all pairs for this particle.
-                          // checkme: how often does this happen?
-                      else {
-                          // printf("No Cons Found: Particle %d \t Step %d\n", gid, step);
-                          // end for p loop
-                          page = i_int3.z;
-                          parstate.y = 0;
-                      }
-                  }
-                */
+                            // if the value of the index array is -1 we have checked all pairs for this particle.
+                            // checkme: how often does this happen?
+                        else {
+                            // printf("No Cons Found: Particle %d \t Step %d\n", gid, step);
+                            // end for p loop
+                            page = i_int3.z;
+                            parstate.y = 0;
+                        }
+                    }
+                  */
                 }
-
 
 
                 bool inside = checkConnections(i_int3, test_lutvalue, nextpos, NewIndex, d4swc);
@@ -350,10 +435,12 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
             if (SaveAll) {
                 int3 dix = make_int3(size, iter, 3);
                 int3 did[4];
-                did[0] = make_int3(gid, i, 0); did[1] = make_int3(gid, i, 1); did[2] = make_int3(gid, i, 2);
+                did[0] = make_int3(gid, i, 0);
+                did[1] = make_int3(gid, i, 1);
+                did[2] = make_int3(gid, i, 2);
                 // did[3] = make_int3(gid, i, 3);
 
-                did[3] = make_int3(s2i(did[0],dix),s2i(did[1],dix),s2i(did[2],dix));
+                did[3] = make_int3(s2i(did[0], dix), s2i(did[1], dix), s2i(did[2], dix));
                 // int4 allid = make_int4(s2i(did[0], dix), s2i(did[1], dix), s2i(did[2], dix), s2i(did[3], dix));
 
                 savedata[did[3].x] = A.x;
@@ -371,7 +458,7 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 // d2.y = fabs((A.y - xnot.y) * vsize);
                 // d2.z = fabs((A.z - xnot.z) * vsize);
 
-                diffusionTensor(&A, &xnot, vsize, dx2, dx4, &d2, i,  gid,  iter,  size);
+                diffusionTensor(&A, &xnot, vsize, dx2, dx4, &d2, i, gid, iter, size);
 
                 // Diffusion Tensor
                 {
@@ -426,7 +513,6 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                     }
                 }*/
             }
-
         }
     }
 }
@@ -448,38 +534,36 @@ int main(int argc, char *argv[]) {
      */
     // Parse Arguments
     if (argc < 2) {
-      // "/autofs/space/symphony_002/users/BenSylvanus/cuda/Sims/data"
+        // "/autofs/space/symphony_002/users/BenSylvanus/cuda/Sims/data"
         path = "/autofs/space/symphony_002/users/BenSylvanus/cuda/Sims";
         std::string InPath = path;
         std::string OutPath = path;
 
-        InPath.append("/data"); OutPath.append("/results");
-        control.Setup(InPath,OutPath,0);
+        InPath.append("/data");
+        OutPath.append("/results");
+        control.Setup(InPath, OutPath, 0);
         control.start();
-    }
-    else {
+    } else {
 
-      control.Setup(argc, argv, 1);
+        control.Setup(argc, argv, 1);
     }
 
     system("clear");
 
     double simparam[10];
     simulation sim = control.getSim();
-    printf("Path: %s\n",sim.getResultPath().c_str());
+    printf("Path: %s\n", sim.getResultPath().c_str());
     path = sim.getResultPath();
     size = sim.getParticle_num();
     iter = sim.getStep_num();
     std::vector<double> simulationparams = sim.getParameterdata();
     SaveAll = sim.getSaveAll();
 
-    if (SaveAll)
-    {
-      printf("Executed True\n");
+    if (SaveAll) {
+        printf("Executed True\n");
 
-    }
-    else {
-      printf("Executed False\n");
+    } else {
+        printf("Executed False\n");
     }
 
 
@@ -593,12 +677,10 @@ int main(int argc, char *argv[]) {
         hostIndexSize = (int *) malloc(3 * sizeof(int));
         mdx2 = (double *) malloc(6 * iter * sizeof(double));
         mdx4 = (double *) malloc(15 * iter * sizeof(double));
-        if (SaveAll)
-        {
-          hostAllData = (double *) malloc(3 * iter * size * sizeof(double));
-        }
-        else {
-          hostAllData = (double *) malloc(3 * sizeof(double));
+        if (SaveAll) {
+            hostAllData = (double *) malloc(3 * iter * size * sizeof(double));
+        } else {
+            hostAllData = (double *) malloc(3 * sizeof(double));
         }
 
         printf("Allocated Host Data\n");
@@ -645,10 +727,9 @@ int main(int argc, char *argv[]) {
         memset(mdx4, 0.0, 15 * iter * sizeof(double));
 
         if (SaveAll) {
-          memset(hostAllData, 0.0, 3 * iter * size * sizeof(double));
-        }
-        else {
-          memset(hostAllData, 0.0, 3 * sizeof(double));
+            memset(hostAllData, 0.0, 3 * iter * size * sizeof(double));
+        } else {
+            memset(hostAllData, 0.0, 3 * sizeof(double));
         }
 
         printf("Set Host Values\n");
@@ -687,12 +768,10 @@ int main(int argc, char *argv[]) {
         cudaMalloc((int **) &deviceNewLut, prod * sizeof(int));
         cudaMalloc((int **) &deviceNewIndex, newindexsize * sizeof(int));
         cudaMalloc((int **) &deviceIndexSize, 3 * sizeof(int));
-        if (SaveAll)
-        {
-          cudaMalloc((double **) &deviceAllData, 3 * iter * size * sizeof(double));
-        }
-        else {
-          cudaMalloc((double **) &deviceAllData, 3 * sizeof(double));
+        if (SaveAll) {
+            cudaMalloc((double **) &deviceAllData, 3 * iter * size * sizeof(double));
+        } else {
+            cudaMalloc((double **) &deviceAllData, 3 * sizeof(double));
         }
         printf("Device Memory Allocated\n");
     }
@@ -709,13 +788,10 @@ int main(int argc, char *argv[]) {
         cudaMemcpy(deviceNewLut, hostNewLut, prod * sizeof(int), cudaMemcpyHostToDevice);
         cudaMemcpy(deviceNewIndex, hostNewIndex, newindexsize * sizeof(int), cudaMemcpyHostToDevice);
         cudaMemcpy(deviceIndexSize, hostIndexSize, 3 * sizeof(int), cudaMemcpyHostToDevice);
-        if (SaveAll)
-        {
-          cudaMemcpy(deviceAllData, hostAllData, 3 * iter * size * sizeof(double), cudaMemcpyHostToDevice);
-        }
-        else
-        {
-          cudaMemcpy(deviceAllData, hostAllData, 3 * sizeof(double), cudaMemcpyHostToDevice);
+        if (SaveAll) {
+            cudaMemcpy(deviceAllData, hostAllData, 3 * iter * size * sizeof(double), cudaMemcpyHostToDevice);
+        } else {
+            cudaMemcpy(deviceAllData, hostAllData, 3 * sizeof(double), cudaMemcpyHostToDevice);
         }
     }
 
@@ -754,11 +830,9 @@ int main(int argc, char *argv[]) {
 
         cudaMemcpy(hostdx2, devicedx2, 6 * iter * sizeof(double), cudaMemcpyDeviceToHost);
         cudaMemcpy(hostdx4, devicedx4, 15 * iter * sizeof(double), cudaMemcpyDeviceToHost);
-        if (SaveAll)
-        {
+        if (SaveAll) {
             cudaMemcpy(hostAllData, deviceAllData, 3 * iter * size * sizeof(double), cudaMemcpyDeviceToHost);
-        }
-        else {
+        } else {
             cudaMemcpy(hostAllData, deviceAllData, 3 * sizeof(double), cudaMemcpyDeviceToHost);
         }
         // cudaMemcpy(hostInitPos, deviceInitPos, 3 * size * sizeof(double), cudaMemcpyDeviceToHost);
@@ -797,13 +871,12 @@ int main(int argc, char *argv[]) {
         t1 = high_resolution_clock::now();
         writeResults(hostdx2, hostdx4, mdx2, mdx4, hostSimP, w_swc, iter, size, nrow, outpath);
         std::string allDataPath = outpath;
-        if (SaveAll)
-        {
-        allDataPath.append("/allData.bin");
-        FILE *outFile = fopen(allDataPath.c_str(), "wb");
-        fwrite(hostAllData, sizeof(double), iter * size * 3, outFile);
-        fclose(outFile);
-      }
+        if (SaveAll) {
+            allDataPath.append("/allData.bin");
+            FILE *outFile = fopen(allDataPath.c_str(), "wb");
+            fwrite(hostAllData, sizeof(double), iter * size * 3, outFile);
+            fclose(outFile);
+        }
     }
 
     t2 = high_resolution_clock::now();
