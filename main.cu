@@ -232,7 +232,7 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 nextpos.z = A.z + (step * cos_phi);
 
                 // check coordinate validity
-                validCoord(&nextpos, &A, &b_int3, &upper, &lower, &floorpos);
+                validCoord(nextpos, A, b_int3, upper, lower, floorpos);
 
                 // floor of next position -> check voxels
                 floorpos = make_int3((int) nextpos.x, (int) nextpos.y, (int) nextpos.z);
