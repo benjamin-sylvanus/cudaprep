@@ -133,8 +133,6 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
             return;
         }
 
-
-
         // Calculate D  (Ax + By + Cz + D = 0)
         double D = -(dot(normal, pointOnPlane));
 
@@ -250,7 +248,6 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
 
                 // position inside the bounds of volume -> state of next position true : false
                 parlut = (lower.x && lower.y && lower.z && upper.x && upper.y && upper.z) ? 1 : 0;
-
 
                 if (parlut == 0) {
                     printf("floorpos: %d %d %d\n", floorpos.x, floorpos.y, floorpos.z);
