@@ -31,273 +31,74 @@
 //////////////////////////////////////////
 // + operator overloads
 //////////////////////////////////////////
-__device__ double3 operator+(const double3 &lhs, const double3 &rhs) {
-    return make_double3(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z);
-}
+__device__ double3 operator+(const double3 &lhs, const double3 &rhs);
 
-__device__ double3 operator+(const double3 &lhs, const double &rhs) {
-    return make_double3(lhs.x + rhs, lhs.y + rhs, lhs.z + rhs);
-}
+__device__ double3 operator+(const double3 &lhs, const double &rhs);
 
-__device__ double3 operator+(const double &lhs, const double3 &rhs) {
-    return make_double3(lhs + rhs.x, lhs + rhs.y, lhs + rhs.z);
-}
+__device__ double3 operator+(const double &lhs, const double3 &rhs);
 
-__device__ double3 operator+=(double3 &lhs, const double3 &rhs) {
-    lhs.x += rhs.x;
-    lhs.y += rhs.y;
-    lhs.z += rhs.z;
-    return lhs;
-}
+__device__ double3 operator+=(double3 &lhs, const double3 &rhs);
 
-__device__ double3 operator+=(double3 &lhs, const double &rhs) {
-    lhs.x += rhs;
-    lhs.y += rhs;
-    lhs.z += rhs;
-    return lhs;
-}
+__device__ double3 operator+=(double3 &lhs, const double &rhs);
 
 //////////////////////////////////////////
 // - operator overloads
 //////////////////////////////////////////
-__device__ double3 operator-(const double3 &lhs, const double3 &rhs) {
-    return make_double3(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z);
-}
+__device__ double3 operator-(const double3 &lhs, const double3 &rhs);
 
-__device__ double3 operator-(const double3 &lhs, const double &rhs) {
-    return make_double3(lhs.x - rhs, lhs.y - rhs, lhs.z - rhs);
-}
+__device__ double3 operator-(const double3 &lhs, const double &rhs);
 
-__device__ double3 operator-(const double &lhs, const double3 &rhs) {
-    return make_double3(lhs - rhs.x, lhs - rhs.y, lhs - rhs.z);
-}
+__device__ double3 operator-(const double &lhs, const double3 &rhs);
 
-__device__ double3 operator-=(double3 &lhs, const double3 &rhs) {
-    lhs.x -= rhs.x;
-    lhs.y -= rhs.y;
-    lhs.z -= rhs.z;
-    return lhs;
-}
+__device__ double3 operator-=(double3 &lhs, const double3 &rhs);
 
-__device__ double3 operator-=(double3 &lhs, const double &rhs) {
-    lhs.x -= rhs;
-    lhs.y -= rhs;
-    lhs.z -= rhs;
-    return lhs;
-}
+__device__ double3 operator-=(double3 &lhs, const double &rhs);
 
 //////////////////////////////////////////
 // * operator overloads
 //////////////////////////////////////////
-__device__ double3 operator*(const double3 &lhs, const double3 &rhs) {
-    return make_double3(lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z);
-}
+__device__ double3 operator*(const double3 &lhs, const double3 &rhs);
 
-__device__ double3 operator*(const double3 &lhs, const double &rhs) {
-    return make_double3(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs);
-}
+__device__ double3 operator*(const double3 &lhs, const double &rhs);
 
-__device__ double3 operator*(const double &lhs, const double3 &rhs) {
-    return make_double3(lhs * rhs.x, lhs * rhs.y, lhs * rhs.z);
-}
+__device__ double3 operator*(const double &lhs, const double3 &rhs);
 
-__device__ double3 operator*=(double3 &lhs, const double3 &rhs) {
-    lhs.x *= rhs.x;
-    lhs.y *= rhs.y;
-    lhs.z *= rhs.z;
-    return lhs;
-}
+__device__ double3 operator*=(double3 &lhs, const double3 &rhs);
 
-__device__ double3 operator*=(double3 &lhs, const double &rhs) {
-    lhs.x *= rhs;
-    lhs.y *= rhs;
-    lhs.z *= rhs;
-    return lhs;
-}
+__device__ double3 operator*=(double3 &lhs, const double &rhs);
 
 //////////////////////////////////////////
 // / operator overloads
 //////////////////////////////////////////
 
-__device__ double3 operator/(const double3 &lhs, const double3 &rhs) {
-    return make_double3(lhs.x / rhs.x, lhs.y / rhs.y, lhs.z / rhs.z);
-}
+__device__ double3 operator/(const double3 &lhs, const double3 &rhs);
 
-__device__ double3 operator/(const double3 &lhs, const double &rhs) {
-    return make_double3(lhs.x / rhs, lhs.y / rhs, lhs.z / rhs);
-}
+__device__ double3 operator/(const double3 &lhs, const double &rhs);
 
-__device__ double3 operator/(const double &lhs, const double3 &rhs) {
-    return make_double3(lhs / rhs.x, lhs / rhs.y, lhs / rhs.z);
-}
+__device__ double3 operator/(const double &lhs, const double3 &rhs);
 
-__device__ double3 operator/=(double3 &lhs, const double3 &rhs) {
-    lhs.x /= rhs.x;
-    lhs.y /= rhs.y;
-    lhs.z /= rhs.z;
-    return lhs;
-}
+__device__ double3 operator/=(double3 &lhs, const double3 &rhs);
 
-__device__ double3 operator/=(double3 &lhs, const double &rhs) {
-    lhs.x /= rhs;
-    lhs.y /= rhs;
-    lhs.z /= rhs;
-    return lhs;
-}
-
-//////////////////////////////////////////
-// == operator overloads
-//////////////////////////////////////////
-__device__ bool operator==(const double3 &lhs, const double3 &rhs) {
-    return (lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z);
-}
-
-__device__ bool operator==(const double3 &lhs, const double &rhs) {
-    return (lhs.x == rhs && lhs.y == rhs && lhs.z == rhs);
-}
-
-__device__ bool operator==(const double &lhs, const double3 &rhs) {
-    return (lhs == rhs.x && lhs == rhs.y && lhs == rhs.z);
-}
-
-//////////////////////////////////////////
-// != operator overloads
-//////////////////////////////////////////
-
-__device__ bool operator!=(const double3 &lhs, const double3 &rhs) {
-    return (lhs.x != rhs.x || lhs.y != rhs.y || lhs.z != rhs.z);
-}
-
-__device__ bool operator!=(const double3 &lhs, const double &rhs) {
-    return (lhs.x != rhs || lhs.y != rhs || lhs.z != rhs);
-}
-
-__device__ bool operator!=(const double &lhs, const double3 &rhs) {
-    return (lhs != rhs.x || lhs != rhs.y || lhs != rhs.z);
-}
-
-//////////////////////////////////////////
-// < operator overloads
-//////////////////////////////////////////
-
-__device__ bool operator<(const double3 &lhs, const double3 &rhs) {
-    return (lhs.x < rhs.x && lhs.y < rhs.y && lhs.z < rhs.z);
-}
-
-__device__ bool operator<(const double3 &lhs, const double &rhs) {
-    return (lhs.x < rhs && lhs.y < rhs && lhs.z < rhs);
-}
-
-__device__ bool operator<(const double &lhs, const double3 &rhs) {
-    return (lhs < rhs.x && lhs < rhs.y && lhs < rhs.z);
-}
-
-//////////////////////////////////////////
-// > operator overloads
-//////////////////////////////////////////
-
-__device__ bool operator>(const double3 &lhs, const double3 &rhs) {
-    return (lhs.x > rhs.x && lhs.y > rhs.y && lhs.z > rhs.z);
-}
-
-__device__ bool operator>(const double3 &lhs, const double &rhs) {
-    return (lhs.x > rhs && lhs.y > rhs && lhs.z > rhs);
-}
-
-__device__ bool operator>(const double &lhs, const double3 &rhs) {
-    return (lhs > rhs.x && lhs > rhs.y && lhs > rhs.z);
-}
-
-//////////////////////////////////////////
-// <= operator overloads
-//////////////////////////////////////////
-
-__device__ bool operator<=(const double3 &lhs, const double3 &rhs) {
-    return (lhs.x <= rhs.x && lhs.y <= rhs.y && lhs.z <= rhs.z);
-}
-
-__device__ bool operator<=(const double3 &lhs, const double &rhs) {
-    return (lhs.x <= rhs && lhs.y <= rhs && lhs.z <= rhs);
-}
-
-__device__ bool operator<=(const double &lhs, const double3 &rhs) {
-    return (lhs <= rhs.x && lhs <= rhs.y && lhs <= rhs.z);
-}
-
-//////////////////////////////////////////
-// >= operator overloads
-//////////////////////////////////////////
-
-__device__ bool operator>=(const double3 &lhs, const double3 &rhs) {
-    return (lhs.x >= rhs.x && lhs.y >= rhs.y && lhs.z >= rhs.z);
-}
-
-__device__ bool operator>=(const double3 &lhs, const double &rhs) {
-    return (lhs.x >= rhs && lhs.y >= rhs && lhs.z >= rhs);
-}
-
-__device__ bool operator>=(const double &lhs, const double3 &rhs) {
-    return (lhs >= rhs.x && lhs >= rhs.y && lhs >= rhs.z);
-}
-
-__device__ double3 operator-(const double3 &lhs) {
-    return make_double3(-lhs.x, -lhs.y, -lhs.z);
-}
+__device__ double3 operator/=(double3 &lhs, const double &rhs);
 
 
 //////////////////////////////////////////
 // dot product
 //////////////////////////////////////////
 
-__device__ double dot(const double3 &lhs, const double3 &rhs) {
-    return (lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z);
-}
-
-//////////////////////////////////////////
-// cross product
-//////////////////////////////////////////
-
-__device__ double3 cross(const double3 &lhs, const double3 &rhs) {
-    return make_double3(lhs.y * rhs.z - lhs.z * rhs.y,
-                        lhs.z * rhs.x - lhs.x * rhs.z,
-                        lhs.x * rhs.y - lhs.y * rhs.x);
-}
+__device__ double dot(const double3 &lhs, const double3 &rhs);
 
 //////////////////////////////////////////
 // length
 //////////////////////////////////////////
 
-__device__ double length(const double3 &lhs) {
-    return sqrt(lhs.x * lhs.x + lhs.y * lhs.y + lhs.z * lhs.z);
-}
+__device__ double length(const double3 &lhs);
 
 //////////////////////////////////////////
 // normalize
 //////////////////////////////////////////
 
-__device__ double3 normalize(const double3 &lhs) {
-    double invLen = 1.0 / sqrt(lhs.x * lhs.x + lhs.y * lhs.y + lhs.z * lhs.z);
-    return make_double3(lhs.x * invLen, lhs.y * invLen, lhs.z * invLen);
-}
-
-//////////////////////////////////////////
-// floor
-//////////////////////////////////////////
-
-__device__ double3 floor(const double3 &lhs) {
-    return make_double3(floor(lhs.x), floor(lhs.y), floor(lhs.z));
-}
-
-
-
-
-
-
-
-
-
-
-
+__device__ double3 normalize(const double3 &lhs);
 
 
 #endif //CUDAPREP_U_OVERLOADS_H

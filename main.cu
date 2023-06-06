@@ -88,8 +88,8 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
 
     while(true)
     {
-        int3 UPPER = make_int3(nextpos.x < High.x, nextpos.y < High.y, nextpos.z < High.z);
-        int3 LOWER = make_int3(nextpos.x > Low.x, nextpos.y > Low.y, nextpos.z > Low.z);
+        int3 UPPER = make_int3(nextpos.x > High.x, nextpos.y > High.y, nextpos.z > High.z);
+        int3 LOWER = make_int3(nextpos.x < Low.x, nextpos.y < Low.y, nextpos.z < Low.z);
 
         // normal vector
         double3 normal;
@@ -133,6 +133,8 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
             return;
         }
 
+
+
         // Calculate D  (Ax + By + Cz + D = 0)
         double D = -(dot(normal, pointOnPlane));
 
@@ -144,6 +146,9 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
 
         double3 reflectionVector = pos - intersectionPoint;
         reflectionVector = reflectionVector - normal * (2 * dot(reflectionVector,normal));
+
+        printf("NextPos: %f %f %f -> %f %f %f\n", nextpos.x, nextpos.y, nextpos.z, intersectionPoint.x+reflectionVector.x, intersectionPoint.y + reflectionVector.y, intersectionPoint.z + reflectionVector.z);
+        printf("Pos: %f %f %f -> %f %f %f\n", pos.x, pos.y, pos.z, intersectionPoint.x, intersectionPoint.y, intersectionPoint.z);
 
         // Update the particle's position
         pos = intersectionPoint;
@@ -238,7 +243,7 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 floorpos = make_int3((int) nextpos.x, (int) nextpos.y, (int) nextpos.z);
 
                 // upper bounds of lookup table
-                upper = make_int3(floorpos.x < b_int3.x, floorpos.y < b_int3.y, floorpos.z < b_int3.z);
+                upper = make_int3(floorpos.x <= b_int3.x, floorpos.y <= b_int3.y, floorpos.z <= b_int3.z);
 
                 // lower bounds of lookup table
                 lower = make_int3(floorpos.x >= 0, floorpos.y >= 0, floorpos.z >= 0);
@@ -248,6 +253,7 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
 
 
                 if (parlut == 0) {
+                    printf("floorpos: %d %d %d\n", floorpos.x, floorpos.y, floorpos.z);
                     // do something
                     // reflection
                     int3 aob;
