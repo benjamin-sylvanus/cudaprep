@@ -5,12 +5,12 @@
 #ifndef CUDAPREP_U_OVERLOADS_H
 #define CUDAPREP_U_OVERLOADS_H
 
-#include "./src/simreader.h"
-#include "./src/simulation.h"
-#include "./src/controller.h"
-#include "./src/viewer.h"
-#include "./src/funcs.h"
-#include "./src/overloads.h"
+#include "simreader.h"
+#include "simulation.h"
+#include "controller.h"
+#include "viewer.h"
+#include "funcs.h"
+
 #include "vector"
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
