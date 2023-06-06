@@ -3,6 +3,7 @@
 #include "./src/controller.h"
 #include "./src/viewer.h"
 #include "./src/funcs.h"
+#include "./src/overloads.h"
 #include "vector"
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
@@ -36,7 +37,6 @@ __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long se
     curand_init(seed, idx, 0, &state[idx]);
 }
 
-
 __device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos, int *NewIndex, double4 *d4swc) {
     int3 vindex;
     double4 child, parent;
@@ -59,8 +59,7 @@ __device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos
             parent = d4swc[vindex.y];
 
             // calculate euclidean distance
-            dist2 = pow(parent.x - child.x, 2) + pow(parent.y - child.y, 2) +
-                    pow(parent.z - child.z, 2);
+            dist2 = pow(parent.x - child.x, 2) + pow(parent.y - child.y, 2) + pow(parent.z - child.z, 2);
 
             // determine whether particle is inside this connection
             bool inside = swc2v(nextpos, child, parent, dist2);
@@ -84,84 +83,71 @@ __device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos
 // validCoord(nextpos, b_int3, &parlut, &upper, &lower, &floorpos);
 __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &upper, int3 &lower, int3 &floorpos)
 {
+    double3 High = make_double3((double)b_int3.x, (double)b_int3.y, (double) b_int3.z);
+    double3 Low = make_double3(0.0, 0.0, 0.0);
+
     while(true)
     {
-        // convert the current position to integer
-        floorpos = make_int3((int) nextpos.x, (int) nextpos.y, (int) nextpos.z);
+        int3 UPPER = make_int3(nextpos.x < High.x, nextpos.y < High.y, nextpos.z < High.z);
+        int3 LOWER = make_int3(nextpos.x > Low.x, nextpos.y > Low.y, nextpos.z > Low.z);
 
-        // upper bounds of lookup table
-        upper = make_int3(floorpos.x < b_int3.x, floorpos.y < b_int3.y, floorpos.z < b_int3.z);
+        // normal vector
+        double3 normal;
 
-        // lower bounds of lookup table
-        lower = make_int3(floorpos.x >= 0, floorpos.y >= 0, floorpos.z >= 0);
+        // point on plane
+        double3 pointOnPlane;
 
-        int3 normal;
-
-        if (lower.x)
+        if (LOWER.x)
         {
-            plane = X_LOW;
-            pointOnPlane = double3(0, nextpos.y, nextpos.z);
-            normal = double3(1, 0, 0);
+            pointOnPlane = make_double3(Low.x, nextpos.y, nextpos.z);
+            normal = make_double3(1.0, 0.0, 0.0);
         }
-        else if (upper.x)
+        else if (UPPER.x)
         {
-            plane = X_HIGH;
-            pointOnPlane = double3(b_int3.x, nextpos.y, nextpos.z);
-            normal = double3(-1, 0, 0);
+            pointOnPlane = make_double3(High.x, nextpos.y, nextpos.z);
+            normal = make_double3(-1.0, 0.0, 0.0);
         }
-        else if (lower.y)
+        else if (LOWER.y)
         {
-            plane = Y_LOW;
-            pointOnPlane = double3(nextpos.x, 0, nextpos.z);
-            normal = double3(0, 1, 0);
+            pointOnPlane = make_double3(nextpos.x, Low.y, nextpos.z);
+            normal = make_double3(0.0, 1.0, 0.0);
         }
-        else if (upper.y)
+        else if (UPPER.y)
         {
-            plane = Y_HIGH;
-            pointOnPlane = double3(nextpos.x, b_int3.y, nextpos.z);
-            normal = double3(0, -1, 0);
+            pointOnPlane = make_double3(nextpos.x, High.y, nextpos.z);
+            normal = make_double3(0.0, -1.0, 0.0);
         }
-        else if (lower.z)
+        else if (LOWER.z)
         {
-            plane = Z_LOW;
-            pointOnPlane = double3(nextpos.x, nextpos.y, 0);
-            normal = double3(0, 0, 1);
-
+            pointOnPlane = make_double3(nextpos.x, nextpos.y, Low.z);
+            normal = make_double3(0.0, 0.0, 1.0);
         }
-        else if (upper.z)
+        else if (UPPER.z)
         {
-            plane = Z_HIGH;
-            pointOnPlane = double3(nextpos.x, nextpos.y, b_int3.z);
-            normal = double3(0, 0, -1);
+            pointOnPlane = make_double3(nextpos.x, nextpos.y, High.z);
+            normal = make_double3(0.0, 0.0, -1.0);
         }
         else
         {
-
             // this should break the loop.....
             return;
         }
 
         // Calculate D  (Ax + By + Cz + D = 0)
-        float D = -normal.dot(pointOnPlane);
+        double D = -(dot(normal, pointOnPlane));
 
         double3 intersectionPoint;
         double3 d = nextpos - pos;
-        float t1 = (-(normal.dot(start) + D)) / normal.dot(d);
-        intersectionPoint = start + d * t1;
+
+        double t1 = (-(dot(normal, pos) + D)) / dot(normal, d);
+        intersectionPoint = pos + d * t1;
 
         double3 reflectionVector = pos - intersectionPoint;
-        reflectionVector = reflectionVector - normal * (2 * reflectionVector.dot(normal));
+        reflectionVector = reflectionVector - normal * (2 * dot(reflectionVector,normal));
+
         // Update the particle's position
         pos = intersectionPoint;
         nextpos = intersectionPoint + reflectionVector;
-
-        // Print some info
-         printf("Reflection vector: %f %f %f\n", reflectionVector.x, reflectionVector.y, reflectionVector.z);
-         printf("Intersection point: %f %f %f\n", intersectionPoint.x, intersectionPoint.y, intersectionPoint.z);
-         printf("Normal: %f %f %f\n", normal.x, normal.y, normal.z);
-         printf("D: %f\n", D);
-         printf("t1: %f\n", t1);
-         printf("Particle position: %f %f %f\n", pos.x, pos.y, pos.z);
     }
 }
 

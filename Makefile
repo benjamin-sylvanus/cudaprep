@@ -7,7 +7,7 @@ srcdir = src
 bindir = bin
 staticLibs = -lcublas -lcurand -lcusparse
 cudaLib = /usr/local/cuda/lib64
-objects =  ./bin/datatemplate.o ./bin/simulation.o ./bin/simreader.o ./bin/controller.o ./bin/viewer.o ./bin/funcs.o
+objects =  ./bin/datatemplate.o ./bin/simulation.o ./bin/simreader.o ./bin/controller.o ./bin/viewer.o ./bin/funcs.o ./bin/overloads.o
 all: $(objects)
 		nvcc -arch=sm_75 -ccbin g++ -dc -L$(cudaLib) main.cu $(staticLibs) -o ./bin/main.o 
 		nvcc  -arch=sm_75 -dlink $(objects)  ./bin/main.o -o ./bin/gpuCode.o
