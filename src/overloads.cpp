@@ -147,5 +147,24 @@ __device__ double3 normalize(const double3 &lhs) {
     return make_double3(lhs.x * invLen, lhs.y * invLen, lhs.z * invLen);
 }
 
+//////////////////////////////////////////
+// distance: double3
+//////////////////////////////////////////
+__device__ double distance(const double3 &lhs, const double3 &rhs) {
+    return sqrt((lhs.x - rhs.x) * (lhs.x - rhs.x) +
+                (lhs.y - rhs.y) * (lhs.y - rhs.y) +
+                (lhs.z - rhs.z) * (lhs.z - rhs.z));
+}
+
+//////////////////////////////////////////
+// distance: double4
+//////////////////////////////////////////
+__device__ double distance(const double4 &lhs, const double4 &rhs) {
+    return sqrt((lhs.x - rhs.x) * (lhs.x - rhs.x) +
+                (lhs.y - rhs.y) * (lhs.y - rhs.y) +
+                (lhs.z - rhs.z) * (lhs.z - rhs.z));
+}
+
+
 
 
