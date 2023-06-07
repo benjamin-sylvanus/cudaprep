@@ -24,15 +24,17 @@
 #define CUDART_PI_F 3.141592654f
 #define PI 3.14159265358979323846
 #define LDPI 3.141592653589793238462643383279502884L
-#define Nc 2;
-#define Nbvec 3;
-#define SOD sizeof (double);
-#define SOI sizeof (int);
-#define SOF sizeof (float);
-#define SOD3 sizeof (double3);
-#define SOD4 sizeof (double4);
-#define SOI3 sizeof (int3);
-#define SOI4 sizeof (int4);
+#define Nc 2
+#define Nbvec 3
+#define SOD (sizeof(double))
+#define SOI (sizeof(int))
+#define SOF (sizeof(float))
+#define SOD3 (sizeof(double3))
+#define SOD4 (sizeof(double4))
+#define SOI3 (sizeof(int3))
+#define SOI4 (sizeof(int4))
+
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 
 using std::cout;
 using std::cin;
@@ -41,6 +43,15 @@ using std::chrono::high_resolution_clock;
 using std::chrono::duration_cast;
 using std::chrono::duration;
 using std::chrono::milliseconds;
+
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+    if (code != cudaSuccess) 
+    {
+        fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+        if (abort) exit(code);
+    }
+}
 
 __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long seed) {
     int idx = threadIdx.x + blockDim.x * blockIdx.x;
@@ -218,7 +229,7 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
         nextpos = intersectionPoint + reflectionVector;
 
         // flip the particle's direction
-        flip[fidx] += 1; // no need for atomicAdd since gid is what is parallelized
+        flips[fidx] += 1; // no need for atomicAdd since gid is what is parallelized
     }
 }
 
@@ -697,7 +708,7 @@ int main(int argc, char *argv[]) {
         hostdx4 = (double *) malloc(15 * iter * SOD);
         hostSimP = (double *) malloc(10 * SOD);
         hostD4Swc = (double4 *) malloc(nrow * SOD4);
-        hostNewLut = (int *) malloc(prod * SOI));
+        hostNewLut = (int *) malloc(prod * SOI);
         hostNewIndex = (int *) malloc(newindexsize * SOI);
         hostIndexSize = (int *) malloc(3 * SOI);
         mdx2 = (double *) malloc(6 * iter * SOD);
@@ -822,66 +833,68 @@ int main(int argc, char *argv[]) {
     // Allocate Memory on Device
     {
 
-        cudaMalloc((double **) &devicedx2, 6 * iter * SOD);
-        cudaMalloc((double **) &devicedx4, 15 * iter * SOD);
-        cudaMalloc((int **) &deviceBounds, 3 * SOI);
-        cudaMalloc((curandStatePhilox4_32_10_t * *) & deviceState, size * sizeof(curandStatePhilox4_32_10_t));
-        cudaMalloc((double **) &deviceSimP, 10 * SOD);
-        cudaMalloc((double4 * *) & deviced4Swc, nrow * SOD4);
-        cudaMalloc((int **) &deviceNewLut, prod * SOI);
-        cudaMalloc((int **) &deviceNewIndex, newindexsize * SOI);
-        cudaMalloc((int **) &deviceIndexSize, 3 * SOI);
+        gpuErrchk(cudaMalloc((double **) &devicedx2, 6 * iter * SOD));
+        gpuErrchk(cudaMalloc((double **) &devicedx4, 15 * iter * SOD));
+        gpuErrchk(cudaMalloc((int **) &deviceBounds, 3 * SOI));
+        gpuErrchk(cudaMalloc((curandStatePhilox4_32_10_t * *) & deviceState, size * sizeof(curandStatePhilox4_32_10_t)));
+        gpuErrchk(cudaMalloc((double **) &deviceSimP, 10 * SOD));
+        gpuErrchk(cudaMalloc((double4 * *) & deviced4Swc, nrow * SOD4));
+        gpuErrchk(cudaMalloc((int **) &deviceNewLut, prod * SOI));
+        gpuErrchk(cudaMalloc((int **) &deviceNewIndex, newindexsize * SOI));
+        gpuErrchk(cudaMalloc((int **) &deviceIndexSize, 3 * SOI));
         if (SaveAll) {
-            cudaMalloc((double **) &deviceAllData, 3 * iter * size * SOD);
+            gpuErrchk(cudaMalloc((double **) &deviceAllData, 3 * iter * size * SOD));
         } else {
-            cudaMalloc((double **) &deviceAllData, 3 * SOD);
+            gpuErrchk(cudaMalloc((double **) &deviceAllData, 3 * SOD));
         }
-        cudaMalloc((double **) &deviceReflections, 3 * iter * size * SOD);
-        cudaMalloc((double **) &deviceURef, 3 * iter * size * SOD);
-        cudaMalloc((int **) &deviceFlip, 3 * size * SOI);
+        gpuErrchk(cudaMalloc((double **) &deviceReflections, 3 * iter * size * SOD));
+        gpuErrchk(cudaMalloc((double **) &deviceURef, 3 * iter * size * SOD));
+        gpuErrchk(cudaMalloc((int **) &deviceFlip, 3 * size * SOI));
 
         // signal variables
-        cudaMalloc((double **) &deviceT2, Nc * SOD);
-        cudaMalloc((double **) &deviceT, Nc * SOD);
+        gpuErrchk(cudaMalloc((double **) &deviceT2, Nc * SOD));
+        gpuErrchk(cudaMalloc((double **) &deviceT, Nc * SOD));
 
-        cudaMalloc((double **) &deviceSigRe, Nbvec * iter * SOD);
-        cudaMalloc((double **) &deviceSig0, Nc * iter * SOD);
-        cudaMalloc((double **) &devicebvec, Nbvec * 3 * SOD);
-        cudaMalloc((double **) &devicebval, Nbvec * SOD);
-        cudaMalloc((double **) &deviceTD, Nbvec * SOD);
+        gpuErrchk(cudaMalloc((double **) &deviceSigRe, Nbvec * iter * SOD));
+        gpuErrchk(cudaMalloc((double **) &deviceSig0, Nc * iter * SOD));
+        gpuErrchk(cudaMalloc((double **) &devicebvec, Nbvec * 3 * SOD));
+        gpuErrchk(cudaMalloc((double **) &devicebval, Nbvec * SOD));
+        gpuErrchk(cudaMalloc((double **) &deviceTD, Nbvec * SOD));
         printf("Device Memory Allocated\n");
     }
 
     // Set Values for Device
     {
         printf("Copying Host data to Device\n");
-        cudaMemcpy(devicedx2, hostdx2, 6 * iter * SOD, cudaMemcpyHostToDevice);
-        cudaMemcpy(devicedx4, hostdx4, 15 * iter * SOD, cudaMemcpyHostToDevice);
-        cudaMemcpy(deviceBounds, hostBounds, 3 * SOI, cudaMemcpyHostToDevice);
+        gpuErrchk(cudaMemcpy(devicedx2, hostdx2, 6 * iter * SOD, cudaMemcpyHostToDevice));
+        gpuErrchk(cudaMemcpy(devicedx4, hostdx4, 15 * iter * SOD, cudaMemcpyHostToDevice));
+        gpuErrchk(cudaMemcpy(deviceBounds, hostBounds, 3 * SOI, cudaMemcpyHostToDevice));
+
         setup_kernel<<<grid, block>>>(deviceState, 1);
-        cudaMemcpy(deviceSimP, hostSimP, 10 * SOD, cudaMemcpyHostToDevice);
-        cudaMemcpy(deviced4Swc, hostD4Swc, nrow * SOD4, cudaMemcpyHostToDevice);
-        cudaMemcpy(deviceNewLut, hostNewLut, prod * SOI, cudaMemcpyHostToDevice);
-        cudaMemcpy(deviceNewIndex, hostNewIndex, newindexsize * SOI, cudaMemcpyHostToDevice);
-        cudaMemcpy(deviceIndexSize, hostIndexSize, 3 * SOI, cudaMemcpyHostToDevice);
+        
+        gpuErrchk(cudaMemcpy(deviceSimP, hostSimP, 10 * SOD, cudaMemcpyHostToDevice));
+        gpuErrchk(cudaMemcpy(deviced4Swc, hostD4Swc, nrow * SOD4, cudaMemcpyHostToDevice));
+        gpuErrchk(cudaMemcpy(deviceNewLut, hostNewLut, prod * SOI, cudaMemcpyHostToDevice));
+        gpuErrchk(cudaMemcpy(deviceNewIndex, hostNewIndex, newindexsize * SOI, cudaMemcpyHostToDevice));
+        gpuErrchk(cudaMemcpy(deviceIndexSize, hostIndexSize, 3 * SOI, cudaMemcpyHostToDevice));
         if (SaveAll) {
-            cudaMemcpy(deviceAllData, hostAllData, 3 * iter * size * SOD, cudaMemcpyHostToDevice);
+            gpuErrchk(cudaMemcpy(deviceAllData, hostAllData, 3 * iter * size * SOD, cudaMemcpyHostToDevice));
         } else {
-            cudaMemcpy(deviceAllData, hostAllData, 3 * SOD, cudaMemcpyHostToDevice);
+            gpuErrchk(cudaMemcpy(deviceAllData, hostAllData, 3 * SOD, cudaMemcpyHostToDevice));
         }
-        cudaMemcpy(deviceReflections, hostReflections, 3 * iter * size * SOD, cudaMemcpyHostToDevice);
-        cudaMemcpy(deviceURef, hosturef, 3 * iter * size * SOD, cudaMemcpyHostToDevice);
-        cudaMemcpy(deviceFlip, hostFlip, 3 * size * SOI, cudaMemcpyHostToDevice);
+        gpuErrchk(cudaMemcpy(deviceReflections, hostReflections, 3 * iter * size * SOD, cudaMemcpyHostToDevice));
+        gpuErrchk(cudaMemcpy(deviceURef, hosturef, 3 * iter * size * SOD, cudaMemcpyHostToDevice));
+        gpuErrchk(cudaMemcpy(deviceFlip, hostFlip, 3 * size * SOI, cudaMemcpyHostToDevice));
 
         // signal variables
-        cudaMemcpy(deviceT2, hostT2, Nc * SOD, cudaMemcpyHostToDevice);
-        cudaMemcpy(deviceT, hostT, Nc * SOD, cudaMemcpyHostToDevice);
+        gpuErrchk(cudaMemcpy(deviceT2, hostT2, Nc * SOD, cudaMemcpyHostToDevice));
+        gpuErrchk(cudaMemcpy(deviceT, hostT, Nc * SOD, cudaMemcpyHostToDevice));
 
-        cudaMemcpy(deviceSigRe, hostSigRe, Nbvec * iter * SOD, cudaMemcpyHostToDevice);
-        cudaMemcpy(deviceSig0, hostSig0, Nc * iter * SOD, cudaMemcpyHostToDevice);
-        cudaMemcpy(devicebvec, hostbvec, Nbvec * 3 * SOD, cudaMemcpyHostToDevice);
-        cudaMemcpy(devicebval, hostbval, Nbvec * SOD, cudaMemcpyHostToDevice);
-        cudaMemcpy(deviceTD, hostTD, Nbvec * SOD, cudaMemcpyHostToDevice);
+        gpuErrchk(cudaMemcpy(deviceSigRe, hostSigRe, Nbvec * iter * SOD, cudaMemcpyHostToDevice));
+        gpuErrchk(cudaMemcpy(deviceSig0, hostSig0, Nc * iter * SOD, cudaMemcpyHostToDevice));
+        gpuErrchk(cudaMemcpy(devicebvec, hostbvec, Nbvec * 3 * SOD, cudaMemcpyHostToDevice));
+        gpuErrchk(cudaMemcpy(devicebval, hostbval, Nbvec * SOD, cudaMemcpyHostToDevice));
+        gpuErrchk(cudaMemcpy(deviceTD, hostTD, Nbvec * SOD, cudaMemcpyHostToDevice));
 
     }
 
@@ -920,23 +933,23 @@ int main(int argc, char *argv[]) {
     // cudaMemcpyDeviceToHost
     {
 
-        cudaMemcpy(hostdx2, devicedx2, 6 * iter * SOD, cudaMemcpyDeviceToHost);
-        cudaMemcpy(hostdx4, devicedx4, 15 * iter * SOD, cudaMemcpyDeviceToHost);
+        gpuErrchk(cudaMemcpy(hostdx2, devicedx2, 6 * iter * SOD, cudaMemcpyDeviceToHost));
+        gpuErrchk(cudaMemcpy(hostdx4, devicedx4, 15 * iter * SOD, cudaMemcpyDeviceToHost));
         if (SaveAll) {
-            cudaMemcpy(hostAllData, deviceAllData, 3 * iter * size * SOD, cudaMemcpyDeviceToHost);
+            gpuErrchk(cudaMemcpy(hostAllData, deviceAllData, 3 * iter * size * SOD, cudaMemcpyDeviceToHost));
         } else {
-            cudaMemcpy(hostAllData, deviceAllData, 3 * SOD, cudaMemcpyDeviceToHost);
+            gpuErrchk(cudaMemcpy(hostAllData, deviceAllData, 3 * SOD, cudaMemcpyDeviceToHost));
         }
         // Reflection Variables
-        cudaMemcpy(hostReflections, deviceReflections, 3 * iter * size * SOD, cudaMemcpyDeviceToHost);
-        cudaMemcpy(hosturef, deviceURef, 3 * iter * size * SOD, cudaMemcpyDeviceToHost);
-        cudaMemcpy(hostFlip, deviceFlip, 3 * size * SOI, cudaMemcpyDeviceToHost);
+        gpuErrchk(cudaMemcpy(hostReflections, deviceReflections, 3 * iter * size * SOD, cudaMemcpyDeviceToHost));
+        gpuErrchk(cudaMemcpy(hosturef, deviceURef, 3 * iter * size * SOD, cudaMemcpyDeviceToHost));
+        gpuErrchk(cudaMemcpy(hostFlip, deviceFlip, 3 * size * SOI, cudaMemcpyDeviceToHost));
 
         // Signal Variables
-        cudaMemcpy(hostT2, deviceT2, Nc * SOD, cudaMemcpyDeviceToHost);
-        cudaMemcpy(hostT, deviceT, Nc * SOD, cudaMemcpyDeviceToHost);
-        cudaMemcpy(hostSigRe, deviceSigRe, Nbvec * iter * SOD, cudaMemcpyDeviceToHost);
-        cudaMemcpy(hostSig0, deviceSig0, Nc * iter * SOD, cudaMemcpyDeviceToHost);
+        gpuErrchk(cudaMemcpy(hostT2, deviceT2, Nc * SOD, cudaMemcpyDeviceToHost));
+        gpuErrchk(cudaMemcpy(hostT, deviceT, Nc * SOD, cudaMemcpyDeviceToHost));
+        gpuErrchk(cudaMemcpy(hostSigRe, deviceSigRe, Nbvec * iter * SOD, cudaMemcpyDeviceToHost));
+        gpuErrchk(cudaMemcpy(hostSig0, deviceSig0, Nc * iter * SOD, cudaMemcpyDeviceToHost));
     }
 
     cudaEventSynchronize(stop_c);
@@ -949,28 +962,28 @@ int main(int argc, char *argv[]) {
     {
 
         printf("Freeing Device Data: ");
-        cudaFree(deviceBounds);
-        cudaFree(deviceState);
-        cudaFree(devicedx2);
-        cudaFree(devicedx4);
-        cudaFree(deviceSimP);
-        cudaFree(deviced4Swc);
-        cudaFree(deviceNewLut);
-        cudaFree(deviceNewIndex);
-        cudaFree(deviceIndexSize);
-        cudaFree(deviceAllData);
+        gpuErrchk(cudaFree(deviceBounds));
+        gpuErrchk(cudaFree(deviceState));
+        gpuErrchk(cudaFree(devicedx2));
+        gpuErrchk(cudaFree(devicedx4));
+        gpuErrchk(cudaFree(deviceSimP));
+        gpuErrchk(cudaFree(deviced4Swc));
+        gpuErrchk(cudaFree(deviceNewLut));
+        gpuErrchk(cudaFree(deviceNewIndex));
+        gpuErrchk(cudaFree(deviceIndexSize));
+        gpuErrchk(cudaFree(deviceAllData));
         // Reflection Variables
-        cudaFree(deviceReflections);
-        cudaFree(deviceURef);
-        cudaFree(deviceFlip);
+        gpuErrchk(cudaFree(deviceReflections));
+        gpuErrchk(cudaFree(deviceURef));
+        gpuErrchk(cudaFree(deviceFlip));
         // Signal Variables
-        cudaFree(deviceT2);
-        cudaFree(deviceT);
-        cudaFree(deviceSigRe);
-        cudaFree(deviceSig0);
-        cudaFree(devicebvec);
-        cudaFree(devicebval);
-        cudaFree(deviceTD);
+        gpuErrchk(cudaFree(deviceT2));
+        gpuErrchk(cudaFree(deviceT));
+        gpuErrchk(cudaFree(deviceSigRe));
+        gpuErrchk(cudaFree(deviceSig0));
+        gpuErrchk(cudaFree(devicebvec));
+        gpuErrchk(cudaFree(devicebval));
+        gpuErrchk(cudaFree(deviceTD));
 
     }
 
