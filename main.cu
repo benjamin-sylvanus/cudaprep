@@ -81,11 +81,29 @@ __device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos
 }
 
 // validCoord(nextpos, b_int3, &parlut, &upper, &lower, &floorpos);
-__device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &upper, int3 &lower, int3 &floorpos)
+__device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &upper, int3 &lower, int3 &floorpos, double * reflections, double * uref, int gid, int i, int size, int iter)
 {
     double3 High = make_double3((double)b_int3.x, (double)b_int3.y, (double) b_int3.z);
     double3 Low = make_double3(0.0, 0.0, 0.0);
+    // determine the index of the reflection storage should match the save data index
 
+    int3 dix = make_int3(size, iter, 3);
+    int3 did[4];
+    did[0] = make_int3(gid, i, 0);
+    did[1] = make_int3(gid, i, 1);
+    did[2] = make_int3(gid, i, 2);
+    did[3] = make_int3(s2i(did[0], dix), s2i(did[1], dix), s2i(did[2], dix));
+
+    // print the id
+    // printf("did.x: %d\tdid.y: %d\tdid.z: %d\n", did[3].x, did[3].y, did[3].z);
+
+    // int4 allid = make_int4(s2i(did[0], dix), s2i(did[1], dix), s2i(did[2], dix), s2i(did[3], dix));
+
+    // savedata[did[3].x] = A.x;
+    // savedata[did[3].y] = A.y;
+    // savedata[did[3].z] = A.z;
+    
+    int count = 0;
     while(true)
     {
         int3 UPPER = make_int3(nextpos.x > High.x, nextpos.y > High.y, nextpos.z > High.z);
@@ -132,24 +150,98 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
             // this should break the loop.....
             return;
         }
+        /*
+        /// Calculate the reflection
+        // First calculate the normal vector of the plane
+        Vector3 normal = normals[plane];
+        normal = normal.normalize();
+
+        // Calculate D  (Ax + By + Cz + D = 0)
+        float D = -normal.dot(pointOnPlane);
+
+        // Calculate the intersection point of the particle's path and the plane
+        Vector3 intersectionPoint;
+
+        bool b = calcIntersect(previousPosition, position, normal, D, intersectionPoint);
+
+        if (!b) {
+            std::cout << "No intersection" << std::endl;
+            return;
+        } else {
+            // Calculate the reflection vector
+            Vector3 reflectionVector = position - intersectionPoint;
+            reflectionVector = reflectionVector - normal * (2 * reflectionVector.dot(normal));
+            reflect = true;
+            unreflected = position;
+            intersection = intersectionPoint;
+            // Update the particle's position
+            position = intersectionPoint + reflectionVector;
+
+            // take the length of the velocity vector and multiply it by the reflection vector
+            float length = velocity.length();
+            reflectionVector = reflectionVector.normalize() * length;
+            // Update the particle's velocity
+            velocity = reflectionVector;
+
+        }
+        */
+
+        /*
+
+
+        // previousPosition:: end
+        // position:: start
+        bool calcIntersect(const Vector3 &end, const Vector3 &start, const Vector3 &normal, float D, Vector3 &intersection) {
+            Vector3 d = end - start;
+            if (normal.dot(d) == 0) {
+                return false;
+            }
+            else {
+                float t1 = (-(normal.dot(start) + D)) / normal.dot(d);
+        //        if (t1 >= 0 && t1 <= 1) {
+                intersection = start + d * t1;
+                return true;
+            }
+        }
+        */
 
         // Calculate D  (Ax + By + Cz + D = 0)
         double D = -(dot(normal, pointOnPlane));
 
         double3 intersectionPoint;
-        double3 d = nextpos - pos;
+        double3 d = pos - nextpos;
 
-        double t1 = (-(dot(normal, pos) + D)) / dot(normal, d);
-        intersectionPoint = pos + d * t1;
+        double t1 = -((dot(normal, nextpos) + D)) / dot(normal, d);
+        intersectionPoint = nextpos + d * t1;
 
-        double3 reflectionVector = pos - intersectionPoint;
+        double3 reflectionVector = nextpos - intersectionPoint;
         reflectionVector = reflectionVector - normal * (2 * dot(reflectionVector,normal));
 
+        // record the unreflected position
+        double3 unreflected = nextpos;
+        double3 intersection = intersectionPoint;
+        nextpos = intersectionPoint + reflectionVector;
+
+
+
         printf("NextPos: %f %f %f -> %f %f %f\n", nextpos.x, nextpos.y, nextpos.z, intersectionPoint.x+reflectionVector.x, intersectionPoint.y + reflectionVector.y, intersectionPoint.z + reflectionVector.z);
-        printf("Pos: %f %f %f -> %f %f %f\n", pos.x, pos.y, pos.z, intersectionPoint.x, intersectionPoint.y, intersectionPoint.z);
+        // printf("Pos: %f %f %f -> %f %f %f\n", pos.x, pos.y, pos.z, intersectionPoint.x, intersectionPoint.y, intersectionPoint.z);
+        printf("Count: %d\n", count);
+        count += 1;
+
+        // store the intersection point
+        reflections[did[3].x] = intersectionPoint.x;
+        reflections[did[3].y] = intersectionPoint.y;
+        reflections[did[3].z] = intersectionPoint.z;
+
+        // store the unreflected vector
+        uref[did[3].x] = unreflected.x;
+        uref[did[3].y] = unreflected.y;
+        uref[did[3].z] = unreflected.z;
+
 
         // Update the particle's position
-        pos = intersectionPoint;
+        // pos = intersectionPoint;
         nextpos = intersectionPoint + reflectionVector;
     }
 }
@@ -159,7 +251,7 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
 __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds, curandStatePhilox4_32_10_t *state,
                          double *SimulationParams,
                          double4 *d4swc, int *nlut, int *NewIndex, int *IndexSize, int size, int iter, bool debug,
-                         double3 point, int SaveAll) {
+                         double3 point, int SaveAll, double *Reflections, double * Uref) {
     int gid = threadIdx.x + blockDim.x * blockIdx.x;
 
     if (gid < size) {
@@ -235,20 +327,21 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 nextpos.z = A.z + (step * cos_phi);
 
                 // check coordinate validity
-                validCoord(nextpos, A, b_int3, upper, lower, floorpos);
+                validCoord(nextpos, A, b_int3, upper, lower, floorpos, Reflections, Uref, gid, i, size, iter);
 
                 // floor of next position -> check voxels
                 floorpos = make_int3((int) nextpos.x, (int) nextpos.y, (int) nextpos.z);
 
                 // upper bounds of lookup table
-                upper = make_int3(floorpos.x <= b_int3.x, floorpos.y <= b_int3.y, floorpos.z <= b_int3.z);
+                upper = make_int3(floorpos.x < b_int3.x, floorpos.y < b_int3.y, floorpos.z < b_int3.z);
 
                 // lower bounds of lookup table
-                lower = make_int3(floorpos.x >= 0, floorpos.y >= 0, floorpos.z >= 0);
+                lower = make_int3(floorpos.x > 0, floorpos.y > 0, floorpos.z > 0);
 
                 // position inside the bounds of volume -> state of next position true : false
                 parlut = (lower.x && lower.y && lower.z && upper.x && upper.y && upper.z) ? 1 : 0;
 
+                /*
                 if (parlut == 0) {
                     printf("floorpos: %d %d %d\n", floorpos.x, floorpos.y, floorpos.z);
                     // do something
@@ -292,6 +385,7 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                     }
 
                 }
+                */
 
                 // extract value of lookup @ index
 
@@ -652,6 +746,8 @@ int main(int argc, char *argv[]) {
     double *mdx2;
     double *mdx4;
     double *hostAllData;
+    double *hostReflections;
+    double *hosturef;
 
     // Alloc Memory for Host Pointers
     {
@@ -671,6 +767,8 @@ int main(int argc, char *argv[]) {
         } else {
             hostAllData = (double *) malloc(3 * sizeof(double));
         }
+        hostReflections = (double *) malloc(3 *iter * size * sizeof(double));
+        hosturef = (double *) malloc(3 *iter * size * sizeof(double));
 
         printf("Allocated Host Data\n");
     }
@@ -720,6 +818,8 @@ int main(int argc, char *argv[]) {
         } else {
             memset(hostAllData, 0.0, 3 * sizeof(double));
         }
+        memset(hostReflections, 0.0, 3 * iter * size * sizeof(double));
+        memset(hosturef, 0.0, 3 * iter * size * sizeof(double));
 
         printf("Set Host Values\n");
     }
@@ -741,6 +841,8 @@ int main(int argc, char *argv[]) {
     int *deviceNewIndex;
     int *deviceIndexSize;
     double *deviceAllData;
+    double *deviceReflections;
+    double *deviceURef;
 
     clock_t start = clock();
     cudaEventRecord(start_c);
@@ -762,6 +864,8 @@ int main(int argc, char *argv[]) {
         } else {
             cudaMalloc((double **) &deviceAllData, 3 * sizeof(double));
         }
+        cudaMalloc((double **) &deviceReflections, 3 * iter * size * sizeof(double));
+        cudaMalloc((double **) &deviceURef, 3 * iter * size * sizeof(double));
         printf("Device Memory Allocated\n");
     }
 
@@ -782,6 +886,8 @@ int main(int argc, char *argv[]) {
         } else {
             cudaMemcpy(deviceAllData, hostAllData, 3 * sizeof(double), cudaMemcpyHostToDevice);
         }
+        cudaMemcpy(deviceReflections, hostReflections, 3 * iter * size * sizeof(double), cudaMemcpyHostToDevice);
+        cudaMemcpy(deviceURef, hosturef, 3 * iter * size * sizeof(double), cudaMemcpyHostToDevice);
     }
 
     // option for printing in kernel
@@ -798,7 +904,7 @@ int main(int argc, char *argv[]) {
 
         simulate<<<grid, block>>>(deviceAllData, devicedx2, devicedx4, deviceBounds, deviceState, deviceSimP,
                                   deviced4Swc,
-                                  deviceNewLut, deviceNewIndex, deviceIndexSize, size, iter, debug, point, SaveAll);
+                                  deviceNewLut, deviceNewIndex, deviceIndexSize, size, iter, debug, point, SaveAll,deviceReflections, deviceURef);
         cudaEventRecord(stop_c);
     }
 
@@ -824,6 +930,8 @@ int main(int argc, char *argv[]) {
         } else {
             cudaMemcpy(hostAllData, deviceAllData, 3 * sizeof(double), cudaMemcpyDeviceToHost);
         }
+        cudaMemcpy(hostReflections, deviceReflections, 3 * iter * size * sizeof(double), cudaMemcpyDeviceToHost);
+        cudaMemcpy(hosturef, deviceURef, 3 * iter * size * sizeof(double), cudaMemcpyDeviceToHost);
         // cudaMemcpy(hostInitPos, deviceInitPos, 3 * size * sizeof(double), cudaMemcpyDeviceToHost);
     }
 
@@ -846,6 +954,8 @@ int main(int argc, char *argv[]) {
         cudaFree(deviceNewIndex);
         cudaFree(deviceIndexSize);
         cudaFree(deviceAllData);
+        cudaFree(deviceReflections);
+        cudaFree(deviceURef);
     }
 
     auto t2 = high_resolution_clock::now();
@@ -866,6 +976,19 @@ int main(int argc, char *argv[]) {
             fwrite(hostAllData, sizeof(double), iter * size * 3, outFile);
             fclose(outFile);
         }
+        std::string reflectionsPath = outpath;
+        reflectionsPath.append("/reflections.bin");
+        FILE *outFile = fopen(reflectionsPath.c_str(), "wb");
+        fwrite(hostReflections, sizeof(double), iter * size * 3, outFile);
+        fclose(outFile);
+
+        std::string urefPath = outpath;
+        urefPath.append("/uref.bin");
+        outFile = fopen(urefPath.c_str(), "wb");
+        fwrite(hosturef, sizeof(double), iter * size * 3, outFile);
+        fclose(outFile);
+
+
     }
 
     t2 = high_resolution_clock::now();
@@ -885,6 +1008,9 @@ int main(int argc, char *argv[]) {
         free(mdx2);
         free(mdx4);
         free(hostAllData);
+        free(hostReflections);
+        free(hosturef);
+
     }
 
     printf("Done!\n");
