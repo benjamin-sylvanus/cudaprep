@@ -167,7 +167,6 @@ __device__ double3 initPosition(int gid, double *dx2, int *Bounds, curandStatePh
   }
   if (init_in == 2)
   {
-    printf("I Made it here\n");
     // init local state var
     xr = curand_uniform4_double(&localstate);
 
