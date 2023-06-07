@@ -54,6 +54,12 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
     }
 }
 
+
+/**
+ * @brief Initializes the random number generator
+ * @param state pointer to the random number generator
+ * @param seed seed for the random number generator
+ */
 __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long seed) {
     int idx = threadIdx.x + blockDim.x * blockIdx.x;
     curand_init(seed, idx, 0, &state[idx]);
@@ -126,7 +132,8 @@ __device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos
  * @param iter number of iterations
  * @param flips reflection counter
  */
-__device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &upper, int3 &lower, int3 &floorpos, double * reflections, double * uref, int gid, int i, int size, int iter, int * flips)
+__device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &upper, int3 &lower, int3 &floorpos,
+                           double * reflections, double * uref, int gid, int i, int size, int iter, int * flips)
 {
     double3 High = make_double3((double)b_int3.x, (double)b_int3.y, (double) b_int3.z);
     double3 Low = make_double3(0.0, 0.0, 0.0);
@@ -144,6 +151,8 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
     int count = 0;
     while(true)
     {
+
+        // TODO implement comparision double3 to double3
         int3 UPPER = make_int3(nextpos.x > High.x, nextpos.y > High.y, nextpos.z > High.z);
         int3 LOWER = make_int3(nextpos.x < Low.x, nextpos.y < Low.y, nextpos.z < Low.z);
 
@@ -234,13 +243,41 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
 }
 
 
+/**
+ * @brief Simulation Kernel for the GPU
+ * @param savedata - the data to be saved
+ * @param dx2 - the second moment of the diffusion tensor
+ * @param dx4 - the fourth moment of the diffusion tensor
+ * @param Bounds - the bounds of the simulation
+ * @param state - the random number generator state
+ * @param SimulationParams - the simulation parameters
+ * @param d4swc - the swc data
+ * @param nlut - the neighbor lookup table
+ * @param NewIndex - the new index
+ * @param IndexSize - the index size
+ * @param size - the number of particles
+ * @param iter - the number of iterations
+ * @param debug - whether or not to print debug statements
+ * @param point - the point to simulate
+ * @param SaveAll - whether or not to save all data
+ * @param Reflections - the reflections
+ * @param Uref - the unreflected data
+ * @param flip - the flip data
+ * @param T2 - the T2 data
+ * @param T - the T data
+ * @param Sig0 - the Sig0 data
+ * @param SigRe - the SigRe data
+ * @param BVec - the BVec data
+ * @param BVal - the BVal data
+ * @param TD - the TD data
+ */
 __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds, curandStatePhilox4_32_10_t *state,
                          double *SimulationParams,
                          double4 *d4swc, int *nlut, int *NewIndex, int *IndexSize, int size, int iter, bool debug,
                          double3 point, int SaveAll, double * Reflections, double * Uref, int * flip,
                          double * T2, double * T, double * Sig0, double * SigRe, double* BVec, double * BVal, double * TD) {
-    int gid = threadIdx.x + blockDim.x * blockIdx.x;
 
+    int gid = threadIdx.x + blockDim.x * blockIdx.x;
     if (gid < size) {
         double step_size = SimulationParams[2];
         double perm_prob = SimulationParams[3];
@@ -255,8 +292,11 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
         int3 upper;
         int3 lower;
         int3 floorpos;
+
+        // TODO convert these to int3 before we pass them in
         int3 b_int3 = make_int3(Bounds[0], Bounds[1], Bounds[2]);
         int3 i_int3 = make_int3(IndexSize[0], IndexSize[1], IndexSize[2]);
+
         double3 d2 = make_double3(0.0, 0.0, 0.0);
         bool completes;
         bool flag;
@@ -306,7 +346,13 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 // generate uniform randoms for step
                 xi = curand_uniform4_double(&localstate);
 
+                // determine if step executes
+                completes = xi.w < perm_prob;
+
                 // set next position
+
+                // TODO Write Function
+                // Should look like computeNext(A, step, xi, nextpos);
                 double theta = 2 * PI * xi.x;
                 double v = xi.y;
                 double cos_phi = 2 * v - 1;
@@ -328,9 +374,6 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 // floor of next position -> check voxels
                 floorpos = make_int3((int) nextpos.x, (int) nextpos.y, (int) nextpos.z);
 
-                // reset particle state for next conditionals
-                parstate.y = 0; // checkme: is this necessary or valid?
-
                 // extract lookup table value
                 int test_lutvalue = nlut[id_test];
                 // extract lookup table value
@@ -340,9 +383,6 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 bool inside = checkConnections(i_int3, test_lutvalue, nextpos, NewIndex, d4swc);
 
                 parstate.y = (inside) ? 1 : 0;
-
-                // determine if step executes
-                completes = xi.w < perm_prob;
 
                 /**
                 * @cases particle inside? 0 0 - update
@@ -397,6 +437,10 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 did[2] = make_int3(gid, i, 2);
                 did[3] = make_int3(s2i(did[0], dix), s2i(did[1], dix), s2i(did[2], dix));
 
+
+                // todo create an indexing overload for this
+                // function should look like setfromd3(double * data, int3 index, double3 value)
+
                 savedata[did[3].x] = A.x;
                 savedata[did[3].y] = A.y;
                 savedata[did[3].z] = A.z;
@@ -405,49 +449,7 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
             // Store Tensor Data
             {
 
-                // calculate displacement
-                {
-                    // d2.x = fabs((A.x - xnot.x) * vsize);
-                    // d2.y = fabs((A.y - xnot.y) * vsize);
-                    // d2.z = fabs((A.z - xnot.z) * vsize);
-
-                }
-
                 diffusionTensor(&A, &xnot, vsize, dx2, dx4, &d2, i, gid, iter, size);
-
-                // Diffusion Tensor
-                {
-                    /*
-                    atomicAdd(&dx2[6 * i + 0], d2.x * d2.x);
-                    atomicAdd(&dx2[6 * i + 1], d2.x * d2.y);
-                    atomicAdd(&dx2[6 * i + 2], d2.x * d2.z);
-                    atomicAdd(&dx2[6 * i + 3], d2.y * d2.y);
-                    atomicAdd(&dx2[6 * i + 4], d2.y * d2.z);
-                    atomicAdd(&dx2[6 * i + 5], d2.z * d2.z);
-                    */
-                }
-
-                // Kurtosis Tensor
-                {
-                    /*
-                    atomicAdd(&dx4[15 * i + 0], d2.x * d2.x * d2.x * d2.x);
-                    atomicAdd(&dx4[15 * i + 1], d2.x * d2.x * d2.x * d2.y);
-                    atomicAdd(&dx4[15 * i + 2], d2.x * d2.x * d2.x * d2.z);
-                    atomicAdd(&dx4[15 * i + 3], d2.x * d2.x * d2.y * d2.y);
-                    atomicAdd(&dx4[15 * i + 4], d2.x * d2.x * d2.y * d2.z);
-                    atomicAdd(&dx4[15 * i + 5], d2.x * d2.x * d2.z * d2.z);
-                    atomicAdd(&dx4[15 * i + 6], d2.x * d2.y * d2.y * d2.y);
-                    atomicAdd(&dx4[15 * i + 7], d2.x * d2.y * d2.y * d2.z);
-                    atomicAdd(&dx4[15 * i + 8], d2.x * d2.y * d2.z * d2.z);
-                    atomicAdd(&dx4[15 * i + 9], d2.x * d2.z * d2.z * d2.z);
-                    atomicAdd(&dx4[15 * i + 10], d2.y * d2.y * d2.y * d2.y);
-                    atomicAdd(&dx4[15 * i + 11], d2.y * d2.y * d2.y * d2.z);
-                    atomicAdd(&dx4[15 * i + 12], d2.y * d2.y * d2.z * d2.z);
-                    atomicAdd(&dx4[15 * i + 13], d2.y * d2.z * d2.z * d2.z);
-                    atomicAdd(&dx4[15 * i + 14], d2.z * d2.z * d2.z * d2.z);
-                    */
-                }
-
                 ////////////////////////////////////////////////////////////////
                 // ========================================================== //
                 // ========================================================== //
