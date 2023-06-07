@@ -80,3 +80,13 @@ __device__ double3
 
  __host__ void
  writeResults(double * hostdx2, double * hostdx4, double * mdx2, double * mdx4, double * hostSimP, double * w_swc, int iter, int size, int nrow, std::string outpath);
+
+
+ /**
+  * @brief Compute the next position of the particle
+  * @param A current position
+  * @param step step size
+  * @param xi random unit vector
+  * @param nextpos next position
+  */
+__device__ void computeNext(double3 &A, double &step, double4 &xi, double3 &nextpos, double &pi);

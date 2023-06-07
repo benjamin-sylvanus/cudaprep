@@ -348,20 +348,7 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
 
                 // TODO Write Function
                 // Should look like computeNext(A, step, xi, nextpos);
-                double theta = 2 * PI * xi.x;
-                double v = xi.y;
-                double cos_phi = 2 * v - 1;
-                double sin_phi = sqrt(1 - pow(cos_phi, 2));
-                nextpos.x = A.x + (step * sin_phi * cos(theta));
-                nextpos.y = A.y + (step * sin_phi * sin(theta));
-                nextpos.z = A.z + (step * cos_phi);
-                double theta = 2 * PI * xi.x;
-                double v = xi.y;
-                double cos_phi = 2 * v - 1;
-                double sin_phi = sqrt(1 - pow(cos_phi, 2));
-                nextpos.x = A.x + (step * sin_phi * cos(theta));
-                nextpos.y = A.y + (step * sin_phi * sin(theta));
-                nextpos.z = A.z + (step * cos_phi);
+                computeNext(A, step, xi, nextpos, PI);
 
                 // check coordinate validity
                 validCoord(nextpos, A, b_int3, upper, lower, floorpos, Reflections, Uref, gid, i, size, iter, flip);
