@@ -332,70 +332,6 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 // floor of next position -> check voxels
                 floorpos = make_int3((int) nextpos.x, (int) nextpos.y, (int) nextpos.z);
 
-                // upper bounds of lookup table
-                upper = make_int3(floorpos.x < b_int3.x, floorpos.y < b_int3.y, floorpos.z < b_int3.z);
-
-                // lower bounds of lookup table
-                lower = make_int3(floorpos.x > 0, floorpos.y > 0, floorpos.z > 0);
-
-                // position inside the bounds of volume -> state of next position true : false
-                parlut = (lower.x && lower.y && lower.z && upper.x && upper.y && upper.z) ? 1 : 0;
-
-                /*
-                if (parlut == 0) {
-                    printf("floorpos: %d %d %d\n", floorpos.x, floorpos.y, floorpos.z);
-                    // do something
-                    // reflection
-                    int3 aob;
-                    aob.x = (lower.x && upper.x) ? 0 : 1;
-                    aob.y = (lower.y && upper.y) ? 0 : 1;
-                    aob.z = (lower.z && upper.z) ? 0 : 1;
-
-                    theta = 2 * PI * xi.x;
-                    v = xi.y;
-                    cos_phi = 2 * v - 1;
-                    sin_phi = sqrt(1 - pow(cos_phi, 2));
-
-                    if (aob.x) {
-                        nextpos.x = A.x - step * sin_phi * cos(theta);
-                    }
-
-                    if (aob.y) {
-                        nextpos.y = A.y - step * sin_phi * sin(theta);
-                    }
-
-                    if (aob.z) {
-                        nextpos.z = A.z - step * cos_phi;
-                    }
-
-                    // floor of next position -> check voxels
-                    floorpos = make_int3((int) nextpos.x, (int) nextpos.y, (int) nextpos.z);
-
-                    // upper bounds of lookup table
-                    upper = make_int3(floorpos.x < b_int3.x, floorpos.y < b_int3.y, floorpos.z < b_int3.z);
-
-                    // lower bounds of lookup table
-                    lower = make_int3(floorpos.x >= 0, floorpos.y >= 0, floorpos.z >= 0);
-
-                    // position inside the bounds of volume -> state of next position true : false
-                    parlut = (lower.x && lower.y && lower.z && upper.x && upper.y && upper.z) ? 1 : 0;
-
-                    if (parlut == 0) {
-                        printf("X: %d\tY: %dZ\t: %d\tResolved::::%d\n", aob.x, aob.y, aob.z, parstate.y);
-                    }
-
-                }
-                */
-
-                // extract value of lookup @ index
-
-                // if parstate.y == 0 then we failed to reflect the particle back into the volume.
-                // throw an error and exit the simulation
-                // if (parlut == 0) {
-                //     printf("Particle %d failed to reflect back into the volume. Exiting simulation.\n", gid);
-                //     exit(1);
-                // }
-
                 // reset particle state for next conditionals
                 parstate.y = 0; // checkme: is this necessary or valid?
 
@@ -418,55 +354,6 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 double dist2;
 
                 // for each connection check if particle inside
-
-                // pre function definition
-                {
-                    /*
-                      for (int page = 0; page < i_int3.z; page++) {
-
-                        // create a subscript indices
-                        int3 c_new = make_int3(test_lutvalue, 0, page);
-                        int3 p_new = make_int3(test_lutvalue, 1, page);
-
-                        // convert subscripted index to linear index and get value from Index Array
-                        vindex.x = NewIndex[s2i(c_new, i_int3)] - 1;
-                        vindex.y = NewIndex[s2i(p_new, i_int3)] - 1;
-
-                        if ((vindex.x) != -1) {
-                            //extract child parent values from swc
-                            child = d4swc[vindex.x];
-                            parent = d4swc[vindex.y];
-
-                            // calculate euclidean distance
-                            dist2 = pow(parent.x - child.x, 2) + pow(parent.y - child.y, 2) +
-                                    pow(parent.z - child.z, 2);
-
-                            // determine whether particle is inside this connection
-                            bool inside = swc2v(nextpos, child, parent, dist2);
-
-                            // if it is inside the connection we don't need to check the remaining.
-                            if (inside) {
-                                // update the particles state
-                                parstate.y = 1;
-
-                                // end for p loop
-                                page = i_int3.z;
-                            }
-                        }
-
-                            // if the value of the index array is -1 we have checked all pairs for this particle.
-                            // checkme: how often does this happen?
-                        else {
-                            // printf("No Cons Found: Particle %d \t Step %d\n", gid, step);
-                            // end for p loop
-                            page = i_int3.z;
-                            parstate.y = 0;
-                        }
-                    }
-                  */
-                }
-
-
                 bool inside = checkConnections(i_int3, test_lutvalue, nextpos, NewIndex, d4swc);
                 if (inside) {
                     // update the particles state
