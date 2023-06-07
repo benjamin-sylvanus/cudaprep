@@ -191,16 +191,6 @@ __device__ void set(double * lhs, int3 &index, double3 &rhs) {
     lhs[index.z] = rhs.z;
 }
 
-//////////////////////////////////////////
-// = operator overloads
-//////////////////////////////////////////
-
-__device__ void operator=(double *lhs, const double3 &rhs, const int3 &index) {
-    lhs[index.x] = rhs.x;
-    lhs[index.y] = rhs.y;
-    lhs[index.z] = rhs.z;
-}
-
 
 
 
