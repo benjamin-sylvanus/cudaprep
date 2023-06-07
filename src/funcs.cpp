@@ -317,3 +317,14 @@ __host__ void writeResults(double * hostdx2, double * hostdx4, double * mdx2, do
   fwrite(t,sizeof(double),iter,outFile);
   fclose(outFile);
 }
+
+
+__device__ void computeNext(double3 &A, double &step, double4 &xi, double3 &nextpos, double &pi) {
+    double theta = 2 * pi * xi.x;
+    double v = xi.y;
+    double cos_phi = 2 * v - 1;
+    double sin_phi = sqrt(1 - pow(cos_phi, 2));
+    nextpos.x = A.x + (step * sin_phi * cos(theta));
+    nextpos.y = A.y + (step * sin_phi * sin(theta));
+    nextpos.z = A.z + (step * cos_phi);
+}
