@@ -121,6 +121,22 @@ __device__ double3 operator/=(double3 &lhs, const double &rhs) {
     return lhs;
 }
 
+//////////////////////////////////////////
+// > operator overloads
+//////////////////////////////////////////
+
+__device__ int3 operator>(const double3 &lhs, const double3 &rhs) {
+    return  make_int3(lhs.x > rhs.x, lhs.y > rhs.y, lhs.z > rhs.z);
+}
+
+
+//////////////////////////////////////////
+// < operator overloads
+//////////////////////////////////////////
+
+__device__ int3 operator<(const double3 &lhs, const double3 &rhs) {
+    return  make_int3(lhs.x < rhs.x, lhs.y < rhs.y, lhs.z < rhs.z);
+}
 
 //////////////////////////////////////////
 // dot product
@@ -164,6 +180,27 @@ __device__ double distance2(const double4 &lhs, const double4 &rhs) {
                 (lhs.y - rhs.y) * (lhs.y - rhs.y) +
                 (lhs.z - rhs.z) * (lhs.z - rhs.z);
 }
+
+
+//////////////////////////////////////////
+// set(double * lhs, int3 &index, double3 &rhs)
+//////////////////////////////////////////
+__device__ void set(double * lhs, int3 &index, double3 &rhs) {
+    lhs[index.x] = rhs.x;
+    lhs[index.y] = rhs.y;
+    lhs[index.z] = rhs.z;
+}
+
+//////////////////////////////////////////
+// = operator overloads
+//////////////////////////////////////////
+
+__device__ void operator=(double *lhs, const double3 &rhs, const int3 &index) {
+    lhs[index.x] = rhs.x;
+    lhs[index.y] = rhs.y;
+    lhs[index.z] = rhs.z;
+}
+
 
 
 
