@@ -89,11 +89,7 @@ __device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos
             parent = d4swc[vindex.y];
 
             // calculate euclidean distance
-
-            dist2 = distance(parent, child);
-            printf("dist via new method: %f\n", dist2);
-            dist2 = pow(parent.x - child.x, 2) + pow(parent.y - child.y, 2) + pow(parent.z - child.z, 2);
-            printf("dist via old method: %f\n", dist2);
+            dist2 = distance2(parent, child);
 
             // determine whether particle is inside this connection
             bool inside = swc2v(nextpos, child, parent, dist2);
@@ -237,7 +233,6 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
 }
 
 
-
 __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds, curandStatePhilox4_32_10_t *state,
                          double *SimulationParams,
                          double4 *d4swc, int *nlut, int *NewIndex, int *IndexSize, int size, int iter, bool debug,
@@ -321,32 +316,13 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 // reset particle state for next conditionals
                 parstate.y = 0; // checkme: is this necessary or valid?
 
-                // sub2ind
-                int id_test = s2i(floorpos, b_int3);
-
                 // extract lookup table value
-                int test_lutvalue = nlut[id_test];
-
-                // child parent indicies
-                int2 vindex;
-
-                // parent swc values
-                double4 parent;
-
-                // child swc values
-                double4 child;
-
-                // distance^2 from child to parent
-                double dist2;
+                int test_lutvalue = nlut[s2i(floorpos,b_int3)];
 
                 // for each connection check if particle inside
                 bool inside = checkConnections(i_int3, test_lutvalue, nextpos, NewIndex, d4swc);
-                if (inside) {
-                    // update the particles state
-                    parstate.y = 1;
-                } else {
-                    parstate.y = 0;
-                }
+
+                parstate.y = (inside) ? 1 : 0;
 
                 // determine if step executes
                 completes = xi.w < perm_prob;
@@ -874,7 +850,7 @@ int main(int argc, char *argv[]) {
         gpuErrchk(cudaMemcpy(deviceBounds, hostBounds, 3 * SOI, cudaMemcpyHostToDevice));
 
         setup_kernel<<<grid, block>>>(deviceState, 1);
-        
+
         gpuErrchk(cudaMemcpy(deviceSimP, hostSimP, 10 * SOD, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(deviced4Swc, hostD4Swc, nrow * SOD4, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(deviceNewLut, hostNewLut, prod * SOI, cudaMemcpyHostToDevice));
