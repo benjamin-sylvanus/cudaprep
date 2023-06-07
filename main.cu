@@ -25,9 +25,16 @@
 #define CUDART_PI_F 3.141592654f
 #define PI 3.14159265358979323846
 #define LDPI 3.141592653589793238462643383279502884L
-#define CUDART_PI_F 3.141592654f
-#define PI 3.14159265358979323846
-#define LDPI 3.141592653589793238462643383279502884L
+#define Nc 2;
+#define Nbvec 3;
+#define SOD sizeof (double);
+#define SOI sizeof (int);
+#define SOF sizeof (float);
+#define SOD3 sizeof (double3);
+#define SOD4 sizeof (double4);
+#define SOI3 sizeof (int3);
+#define SOI4 sizeof (int4);
+
 using std::cout;
 using std::cin;
 using std::endl;
@@ -41,6 +48,15 @@ __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long se
     curand_init(seed, idx, 0, &state[idx]);
 }
 
+/**
+ * @brief Checks if the particle is inside the connections listed for voxel
+ * @param i_int3 size of the index array
+ * @param test_lutvalue index of the voxel
+ * @param nextpos position of the particle
+ * @param NewIndex index array
+ * @param d4swc swc array
+ * @return true if particle is inside the connection
+ */
 __device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos, int *NewIndex, double4 *d4swc) {
     int3 vindex;
     double4 child, parent;
@@ -83,14 +99,28 @@ __device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos
     }
     return false;
 }
-
-// validCoord(nextpos, b_int3, &parlut, &upper, &lower, &floorpos);
-__device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &upper, int3 &lower, int3 &floorpos, double * reflections, double * uref, int gid, int i, int size, int iter)
+/**
+ * @brief Checks the validity of the next position and updates the position and next position accordingly.
+ * @param nextpos next position
+ * @param pos current position
+ * @param b_int3 bounding box
+ * @param upper upper bound
+ * @param lower lower bound
+ * @param floorpos floor position
+ * @param reflections reflection storage
+ * @param uref reflection storage
+ * @param gid particle id
+ * @param i step id
+ * @param size number of particles
+ * @param iter number of iterations
+ * @param flips reflection counter
+ */
+__device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &upper, int3 &lower, int3 &floorpos, double * reflections, double * uref, int gid, int i, int size, int iter, int * flips)
 {
     double3 High = make_double3((double)b_int3.x, (double)b_int3.y, (double) b_int3.z);
     double3 Low = make_double3(0.0, 0.0, 0.0);
-    // determine the index of the reflection storage should match the save data index
 
+    // determine the index of the reflection storage should match the save data index
     int3 dix = make_int3(size, iter, 3);
     int3 did[4];
     did[0] = make_int3(gid, i, 0);
@@ -98,15 +128,8 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
     did[2] = make_int3(gid, i, 2);
     did[3] = make_int3(s2i(did[0], dix), s2i(did[1], dix), s2i(did[2], dix));
 
-    // print the id
-    // printf("did.x: %d\tdid.y: %d\tdid.z: %d\n", did[3].x, did[3].y, did[3].z);
+    int fidx; // flip index for reflection
 
-    // int4 allid = make_int4(s2i(did[0], dix), s2i(did[1], dix), s2i(did[2], dix), s2i(did[3], dix));
-
-    // savedata[did[3].x] = A.x;
-    // savedata[did[3].y] = A.y;
-    // savedata[did[3].z] = A.z;
-    
     int count = 0;
     while(true)
     {
@@ -121,31 +144,37 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
 
         if (LOWER.x)
         {
+            fidx = 6*gid + 0;
             pointOnPlane = make_double3(Low.x, nextpos.y, nextpos.z);
             normal = make_double3(1.0, 0.0, 0.0);
         }
         else if (UPPER.x)
         {
+            fidx = 6*gid + 1;
             pointOnPlane = make_double3(High.x, nextpos.y, nextpos.z);
             normal = make_double3(-1.0, 0.0, 0.0);
         }
         else if (LOWER.y)
         {
+            fidx = 6*gid + 2;
             pointOnPlane = make_double3(nextpos.x, Low.y, nextpos.z);
             normal = make_double3(0.0, 1.0, 0.0);
         }
         else if (UPPER.y)
         {
+            fidx = 6*gid + 3;
             pointOnPlane = make_double3(nextpos.x, High.y, nextpos.z);
             normal = make_double3(0.0, -1.0, 0.0);
         }
         else if (LOWER.z)
         {
+            fidx = 6*gid + 4;
             pointOnPlane = make_double3(nextpos.x, nextpos.y, Low.z);
             normal = make_double3(0.0, 0.0, 1.0);
         }
         else if (UPPER.z)
         {
+            fidx = 6*gid + 5;
             pointOnPlane = make_double3(nextpos.x, nextpos.y, High.z);
             normal = make_double3(0.0, 0.0, -1.0);
         }
@@ -154,60 +183,6 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
             // this should break the loop.....
             return;
         }
-        /*
-        /// Calculate the reflection
-        // First calculate the normal vector of the plane
-        Vector3 normal = normals[plane];
-        normal = normal.normalize();
-
-        // Calculate D  (Ax + By + Cz + D = 0)
-        float D = -normal.dot(pointOnPlane);
-
-        // Calculate the intersection point of the particle's path and the plane
-        Vector3 intersectionPoint;
-
-        bool b = calcIntersect(previousPosition, position, normal, D, intersectionPoint);
-
-        if (!b) {
-            std::cout << "No intersection" << std::endl;
-            return;
-        } else {
-            // Calculate the reflection vector
-            Vector3 reflectionVector = position - intersectionPoint;
-            reflectionVector = reflectionVector - normal * (2 * reflectionVector.dot(normal));
-            reflect = true;
-            unreflected = position;
-            intersection = intersectionPoint;
-            // Update the particle's position
-            position = intersectionPoint + reflectionVector;
-
-            // take the length of the velocity vector and multiply it by the reflection vector
-            float length = velocity.length();
-            reflectionVector = reflectionVector.normalize() * length;
-            // Update the particle's velocity
-            velocity = reflectionVector;
-
-        }
-        */
-
-        /*
-
-
-        // previousPosition:: end
-        // position:: start
-        bool calcIntersect(const Vector3 &end, const Vector3 &start, const Vector3 &normal, float D, Vector3 &intersection) {
-            Vector3 d = end - start;
-            if (normal.dot(d) == 0) {
-                return false;
-            }
-            else {
-                float t1 = (-(normal.dot(start) + D)) / normal.dot(d);
-        //        if (t1 >= 0 && t1 <= 1) {
-                intersection = start + d * t1;
-                return true;
-            }
-        }
-        */
 
         // Calculate D  (Ax + By + Cz + D = 0)
         double D = -(dot(normal, pointOnPlane));
@@ -226,10 +201,7 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
         double3 intersection = intersectionPoint;
         nextpos = intersectionPoint + reflectionVector;
 
-
-
         printf("NextPos: %f %f %f -> %f %f %f\n", nextpos.x, nextpos.y, nextpos.z, intersectionPoint.x+reflectionVector.x, intersectionPoint.y + reflectionVector.y, intersectionPoint.z + reflectionVector.z);
-        // printf("Pos: %f %f %f -> %f %f %f\n", pos.x, pos.y, pos.z, intersectionPoint.x, intersectionPoint.y, intersectionPoint.z);
         printf("Count: %d\n", count);
         count += 1;
 
@@ -243,10 +215,11 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
         uref[did[3].y] = unreflected.y;
         uref[did[3].z] = unreflected.z;
 
-
         // Update the particle's position
-        // pos = intersectionPoint;
         nextpos = intersectionPoint + reflectionVector;
+
+        // flip the particle's direction
+        flip[fidx] += 1; // no need for atomicAdd since gid is what is parallelized
     }
 }
 
@@ -255,7 +228,8 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
 __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds, curandStatePhilox4_32_10_t *state,
                          double *SimulationParams,
                          double4 *d4swc, int *nlut, int *NewIndex, int *IndexSize, int size, int iter, bool debug,
-                         double3 point, int SaveAll, double *Reflections, double * Uref) {
+                         double3 point, int SaveAll, double * Reflections, double * Uref, int * flip,
+                         double * T2, double * T, double * Sig0, double * SigRe, double* BVec, double * BVal, double * TD) {
     int gid = threadIdx.x + blockDim.x * blockIdx.x;
 
     if (gid < size) {
@@ -266,10 +240,6 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
         double vsize = SimulationParams[9];
         double3 A;
         int2 parstate;
-
-        // int3 gx = make_int3(3 * gid + 0, 3 * gid + 1, 3 * gid + 2);
-        // int3 gx = make_int3(3 * gid + 0, 3 * gid + 1, 3 * gid + 2);
-        // define variables for loop
         double4 xi;
         double3 nextpos;
         double3 xnot;
@@ -287,10 +257,8 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
         // signal variables
         {
             /*
-
-            double s0 = 0; // Signal weighted by T2 relaxation
-            double t[Nc_max] = {0}; // The time staying in compartments
-
+             * double s0 = 0; // Signal weighted by T2 relaxation
+             * double t[Nc_max] = {0}; // The time staying in compartments
             */
         }
         ////////////////////
@@ -346,7 +314,7 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 nextpos.z = A.z + (step * cos_phi);
 
                 // check coordinate validity
-                validCoord(nextpos, A, b_int3, upper, lower, floorpos, Reflections, Uref, gid, i, size, iter);
+                validCoord(nextpos, A, b_int3, upper, lower, floorpos, Reflections, Uref, gid, i, size, iter, flip);
 
                 // floor of next position -> check voxels
                 floorpos = make_int3((int) nextpos.x, (int) nextpos.y, (int) nextpos.z);
@@ -396,8 +364,6 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
 
                 // determine if step executes
                 completes = xi.w < perm_prob;
-                // completes.x = xi.w < perm.x;
-                // completes.y = xi.w < perm.y;
 
                 /**
                 * particle inside? 0 0 - update
@@ -406,21 +372,15 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 * particle inside? 1 1 - update
                 */
 
-                // particle inside: [0 0] || [1 1]
-                if (parstate.x == parstate.y) { A = nextpos; }
-
-                // particle inside: [1 0]
-                if (parstate.x && !parstate.y) {
-                    if (completes == true) {
-                // completes.x = xi.w < perm.x;
-                // completes.y = xi.w < perm.y;
-
-                /**
-                * particle inside? 0 0 - update
-                * particle inside? 0 1 - check if updates
-                * particle inside? 1 0 - check if updates
-                * particle inside? 1 1 - update
-                */
+                ////////////////////////////////////////////////////////////////
+                // ========================================================== //
+                // ========================================================== //
+                ////////////////////////////////////////////////////////////////
+                ///////////////// UPDATE PARTICLE COMPARTMENT //////////////////
+                ////////////////////////////////////////////////////////////////
+                // ========================================================== //
+                // ========================================================== //
+                ////////////////////////////////////////////////////////////////
 
                 // particle inside: [0 0] || [1 1]
                 if (parstate.x == parstate.y) { A = nextpos; }
@@ -456,25 +416,23 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 did[0] = make_int3(gid, i, 0);
                 did[1] = make_int3(gid, i, 1);
                 did[2] = make_int3(gid, i, 2);
-                // did[3] = make_int3(gid, i, 3);
-
                 did[3] = make_int3(s2i(did[0], dix), s2i(did[1], dix), s2i(did[2], dix));
-                // int4 allid = make_int4(s2i(did[0], dix), s2i(did[1], dix), s2i(did[2], dix), s2i(did[3], dix));
 
                 savedata[did[3].x] = A.x;
                 savedata[did[3].y] = A.y;
                 savedata[did[3].z] = A.z;
-                // savedata[allid.w] = (double) flag;
             }
 
             // Store Tensor Data
             {
-                // diffusionTensor(A, xnot, vsize, dx2, savedata, d2, i, gid, iter, size);
 
                 // calculate displacement
-                // d2.x = fabs((A.x - xnot.x) * vsize);
-                // d2.y = fabs((A.y - xnot.y) * vsize);
-                // d2.z = fabs((A.z - xnot.z) * vsize);
+                {
+                    // d2.x = fabs((A.x - xnot.x) * vsize);
+                    // d2.y = fabs((A.y - xnot.y) * vsize);
+                    // d2.z = fabs((A.z - xnot.z) * vsize);
+
+                }
 
                 diffusionTensor(&A, &xnot, vsize, dx2, dx4, &d2, i, gid, iter, size);
 
@@ -511,24 +469,66 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                     */
                 }
 
+                ////////////////////////////////////////////////////////////////
+                // ========================================================== //
+                // ========================================================== //
+                ////////////////////////////////////////////////////////////////
+                ///////////////////////// SIGNAL ///////////////////////////////
+                ////////////////////////////////////////////////////////////////
+                // ========================================================== //
+                // ========================================================== //
+                ////////////////////////////////////////////////////////////////
+                ////////////////////////////////////////////////////////////////
 
                 // Signal
                 /*{
-
+                    // loop over compartments
                     s0 = 0.0;
                     for (int j = 0; j < Nc; j++) {
+                        // sum over all compartments
                         s0 = s0 + (t[j] / T2[j]);
                     }
 
                     s0 = exp(-1.0 * s0);
-                    atomAdd(&sig0[tidx], s0);
+
+                    // sig0 is the sum of all compartments
+                    atomicAdd(&sig0[tidx], s0);
+
+                    // atomAdd(&sig0[tidx], s0);
 
                     // loop over b values
                     for (int j = 0; j < Nbvec; j++) {
+                        // bval is the b value
+                        // bvec is the gradient direction vector
+                        // TD is the diffusion time
+                        // qx is the q value
+                        // d2.x, d2.y, d2.z are the displacements defined as fabs((A - xnot) * vsize);
+                        // get the bvec for the current b value
+                        bd = make_double3(bvec[j * 3 + 0], bvec[j * 3 + 1], bvec[j * 3 + 2]);
+                        bv = bval[j];
+                        td = TD[tidx];
+                        // qx = sqrt(bv / td) * dot(d2, bd);
+                        qx = sqrt(bv / td) * (d2.x * bd.x + d2.y * bd.y + d2.z * bd.z);
                         qx = sqrt(bval[j] / TD[tidx]) * (d2.x * bvec[j * 3 + 0] + d2.y * bvec[j * 3 + 1] + d2.z * bvec[j * 3 + 2]);
                         // qx = sqrt(bval[j] / TD[tidx]) * (dx * bvec[j * 3 + 0] + dy * bvec[j * 3 + 1] + dz * bvec[j * 3 + 2]);
                         atomAdd(&sigRe[Nbvec * tidx + j], s0 * cos(qx));
                     }
+
+                    Sizes:
+                    Nc: Number of Compartments
+                    * t
+                    * T2
+
+                    Nbvec: Number of b values
+                    * bvec
+                    * bval
+                    * TD
+
+                    i: steps
+                    * sigRe
+                    * sig0
+
+
                 }*/
             }
         }
@@ -690,27 +690,70 @@ int main(int argc, char *argv[]) {
     double *hostAllData;
     double *hostReflections;
     double *hosturef;
+    int* hostFlip;
+
+    // signal variables
+    /*
+    Sizes:
+    Nc: Number of Compartments
+    * t * 1
+    * T2 * 1
+
+    Nbvec: Number of b values
+    * bvec * 3
+    * bval * 1
+    * TD * 1
+
+    i: steps
+    * sigRe Nbvec * i
+    * sig0 Nc * i
+    *
+
+    // sum of all signals per time step per b value
+
+    &sigRe[Nbvec * tidx + j], s0 * cos(qx));
+    */
+
+    double *hostT2; // Nc * 1
+    double *hostT; // Nc * 1
+    double *hostSigRe; // Nbvec * iter
+    double *hostSig0; // Nc * iter
+    double *hostbvec; // Nbvec * 3 (x,y,z)
+    double *hostbval; // Nbvec * 1 (b)
+    double *hostTD; // Nbvec * 1 (TD)
+
+
 
     // Alloc Memory for Host Pointers
     {
 
-        hostBounds = (int *) malloc(3 * sizeof(int));
-        hostdx2 = (double *) malloc(6 * iter * sizeof(double));
-        hostdx4 = (double *) malloc(15 * iter * sizeof(double));
-        hostSimP = (double *) malloc(10 * sizeof(double));
-        hostD4Swc = (double4 *) malloc(nrow * sizeof(double4));
-        hostNewLut = (int *) malloc(prod * sizeof(int));
-        hostNewIndex = (int *) malloc(newindexsize * sizeof(int));
-        hostIndexSize = (int *) malloc(3 * sizeof(int));
-        mdx2 = (double *) malloc(6 * iter * sizeof(double));
-        mdx4 = (double *) malloc(15 * iter * sizeof(double));
+        hostBounds = (int *) malloc(3 * SOI);
+        hostdx2 = (double *) malloc(6 * iter * SOD);
+        hostdx4 = (double *) malloc(15 * iter * SOD);
+        hostSimP = (double *) malloc(10 * SOD);
+        hostD4Swc = (double4 *) malloc(nrow * SOD4);
+        hostNewLut = (int *) malloc(prod * SOI));
+        hostNewIndex = (int *) malloc(newindexsize * SOI);
+        hostIndexSize = (int *) malloc(3 * SOI);
+        mdx2 = (double *) malloc(6 * iter * SOD);
+        mdx4 = (double *) malloc(15 * iter * SOD);
         if (SaveAll) {
-            hostAllData = (double *) malloc(3 * iter * size * sizeof(double));
+            hostAllData = (double *) malloc(3 * iter * size * SOD);
         } else {
-            hostAllData = (double *) malloc(3 * sizeof(double));
+            hostAllData = (double *) malloc(3 * SOD);
         }
-        hostReflections = (double *) malloc(3 *iter * size * sizeof(double));
-        hosturef = (double *) malloc(3 *iter * size * sizeof(double));
+        hostReflections = (double *) malloc(3 *iter * size * SOD);
+        hosturef = (double *) malloc(3 *iter * size * SOD);
+        hostFlip = (int *) malloc(3 * size * SOI);
+
+        // signal variables
+        hostT2 = (double *) malloc(Nc * SOD);
+        hostT = (double *) malloc(Nc * SOD);
+        hostSigRe = (double *) malloc(Nbvec * iter * SOD);
+        hostSig0 = (double *) malloc(Nc * iter * SOD);
+        hostbvec = (double *) malloc(Nbvec * 3 * SOD);
+        hostbval = (double *) malloc(Nbvec * SOD);
+        hostTD = (double *) malloc(Nbvec * SOD);
 
         printf("Allocated Host Data\n");
     }
@@ -721,8 +764,8 @@ int main(int argc, char *argv[]) {
         hostBounds[0] = boundx;
         hostBounds[1] = boundy;
         hostBounds[2] = boundz;
-        memset(hostdx2, 0.0, 6 * iter * sizeof(double));
-        memset(hostdx4, 0.0, 15 * iter * sizeof(double));
+        memset(hostdx2, 0.0, 6 * iter * SOD);
+        memset(hostdx4, 0.0, 15 * iter * SOD);
         {
 
             for (int i = 0; i < 10; i++) {
@@ -733,8 +776,8 @@ int main(int argc, char *argv[]) {
         hostBounds[0] = boundx;
         hostBounds[1] = boundy;
         hostBounds[2] = boundz;
-        memset(hostdx2, 0.0, 6 * iter * sizeof(double));
-        memset(hostdx4, 0.0, 15 * iter * sizeof(double));
+        memset(hostdx2, 0.0, 6 * iter * SOD);
+        memset(hostdx4, 0.0, 15 * iter * SOD);
         {
 
             for (int i = 0; i < 10; i++) {
@@ -770,17 +813,27 @@ int main(int argc, char *argv[]) {
             }
 
         }
-        memset(mdx2, 0.0, 6 * iter * sizeof(double));
-        memset(mdx4, 0.0, 15 * iter * sizeof(double));
+        memset(mdx2, 0.0, 6 * iter * SOD);
+        memset(mdx4, 0.0, 15 * iter * SOD);
 
         if (SaveAll) {
-            memset(hostAllData, 0.0, 3 * iter * size * sizeof(double));
+            memset(hostAllData, 0.0, 3 * iter * size * SOD);
         } else {
-            memset(hostAllData, 0.0, 3 * sizeof(double));
+            memset(hostAllData, 0.0, 3 * SOD);
         }
-        memset(hostReflections, 0.0, 3 * iter * size * sizeof(double));
-        memset(hosturef, 0.0, 3 * iter * size * sizeof(double));
+        memset(hostReflections, 0.0, 3 * iter * size * SOD);
+        memset(hosturef, 0.0, 3 * iter * size * SOD);
+        memset(hostFlip, 0.0, 3 * size * SOI);
 
+        // signal variables
+        memset(hostT2, 0.0, Nc * SOD); // T2 is read from file?
+        memset(hostT, 0.0, Nc * SOD); // T is set to 0.0
+
+        memset(hostSigRe, 0.0, Nbvec * iter * SOD); // Calculated in kernel
+        memset(hostSig0, 0.0, Nc * iter * SOD); // Calculated in kernel
+        memset(hostbvec, 0.0, Nbvec * 3 * SOD); // bvec is read from file
+        memset(hostbval, 0.0, Nbvec * SOD); // bval is read from file
+        memset(hostTD, 0.0, Nbvec * SOD); // TD is read from file
         printf("Set Host Values\n");
     }
 
@@ -803,6 +856,18 @@ int main(int argc, char *argv[]) {
     double *deviceAllData;
     double *deviceReflections;
     double *deviceURef;
+    int *deviceFlip;
+
+    // signal variables
+    double *deviceT2;
+    double *deviceT;
+
+    double *deviceSigRe;
+    double *deviceSig0;
+    double *devicebvec;
+    double *devicebval;
+    double *deviceTD;
+
 
     clock_t start = clock();
     cudaEventRecord(start_c);
@@ -811,44 +876,67 @@ int main(int argc, char *argv[]) {
     // Allocate Memory on Device
     {
 
-        cudaMalloc((double **) &devicedx2, 6 * iter * sizeof(double));
-        cudaMalloc((double **) &devicedx4, 15 * iter * sizeof(double));
-        cudaMalloc((int **) &deviceBounds, 3 * sizeof(int));
+        cudaMalloc((double **) &devicedx2, 6 * iter * SOD);
+        cudaMalloc((double **) &devicedx4, 15 * iter * SOD);
+        cudaMalloc((int **) &deviceBounds, 3 * SOI);
         cudaMalloc((curandStatePhilox4_32_10_t * *) & deviceState, size * sizeof(curandStatePhilox4_32_10_t));
-        cudaMalloc((double **) &deviceSimP, 10 * sizeof(double));
-        cudaMalloc((double4 * *) & deviced4Swc, nrow * sizeof(double4));
-        cudaMalloc((int **) &deviceNewLut, prod * sizeof(int));
-        cudaMalloc((int **) &deviceNewIndex, newindexsize * sizeof(int));
-        cudaMalloc((int **) &deviceIndexSize, 3 * sizeof(int));
+        cudaMalloc((double **) &deviceSimP, 10 * SOD);
+        cudaMalloc((double4 * *) & deviced4Swc, nrow * SOD4);
+        cudaMalloc((int **) &deviceNewLut, prod * SOI);
+        cudaMalloc((int **) &deviceNewIndex, newindexsize * SOI);
+        cudaMalloc((int **) &deviceIndexSize, 3 * SOI);
         if (SaveAll) {
-            cudaMalloc((double **) &deviceAllData, 3 * iter * size * sizeof(double));
+            cudaMalloc((double **) &deviceAllData, 3 * iter * size * SOD);
         } else {
-            cudaMalloc((double **) &deviceAllData, 3 * sizeof(double));
+            cudaMalloc((double **) &deviceAllData, 3 * SOD);
         }
-        cudaMalloc((double **) &deviceReflections, 3 * iter * size * sizeof(double));
-        cudaMalloc((double **) &deviceURef, 3 * iter * size * sizeof(double));
+        cudaMalloc((double **) &deviceReflections, 3 * iter * size * SOD);
+        cudaMalloc((double **) &deviceURef, 3 * iter * size * SOD);
+        cudaMalloc((int **) &deviceFlip, 3 * size * SOI);
+
+        // signal variables
+        cudaMalloc((double **) &deviceT2, Nc * SOD);
+        cudaMalloc((double **) &deviceT, Nc * SOD);
+
+        cudaMalloc((double **) &deviceSigRe, Nbvec * iter * SOD);
+        cudaMalloc((double **) &deviceSig0, Nc * iter * SOD);
+        cudaMalloc((double **) &devicebvec, Nbvec * 3 * SOD);
+        cudaMalloc((double **) &devicebval, Nbvec * SOD);
+        cudaMalloc((double **) &deviceTD, Nbvec * SOD);
         printf("Device Memory Allocated\n");
     }
 
     // Set Values for Device
     {
         printf("Copying Host data to Device\n");
-        cudaMemcpy(devicedx2, hostdx2, 6 * iter * sizeof(double), cudaMemcpyHostToDevice);
-        cudaMemcpy(devicedx4, hostdx4, 15 * iter * sizeof(double), cudaMemcpyHostToDevice);
-        cudaMemcpy(deviceBounds, hostBounds, 3 * sizeof(int), cudaMemcpyHostToDevice);
+        cudaMemcpy(devicedx2, hostdx2, 6 * iter * SOD, cudaMemcpyHostToDevice);
+        cudaMemcpy(devicedx4, hostdx4, 15 * iter * SOD, cudaMemcpyHostToDevice);
+        cudaMemcpy(deviceBounds, hostBounds, 3 * SOI, cudaMemcpyHostToDevice);
         setup_kernel<<<grid, block>>>(deviceState, 1);
-        cudaMemcpy(deviceSimP, hostSimP, 10 * sizeof(double), cudaMemcpyHostToDevice);
-        cudaMemcpy(deviced4Swc, hostD4Swc, nrow * sizeof(double4), cudaMemcpyHostToDevice);
-        cudaMemcpy(deviceNewLut, hostNewLut, prod * sizeof(int), cudaMemcpyHostToDevice);
-        cudaMemcpy(deviceNewIndex, hostNewIndex, newindexsize * sizeof(int), cudaMemcpyHostToDevice);
-        cudaMemcpy(deviceIndexSize, hostIndexSize, 3 * sizeof(int), cudaMemcpyHostToDevice);
+        cudaMemcpy(deviceSimP, hostSimP, 10 * SOD, cudaMemcpyHostToDevice);
+        cudaMemcpy(deviced4Swc, hostD4Swc, nrow * SOD4, cudaMemcpyHostToDevice);
+        cudaMemcpy(deviceNewLut, hostNewLut, prod * SOI, cudaMemcpyHostToDevice);
+        cudaMemcpy(deviceNewIndex, hostNewIndex, newindexsize * SOI, cudaMemcpyHostToDevice);
+        cudaMemcpy(deviceIndexSize, hostIndexSize, 3 * SOI, cudaMemcpyHostToDevice);
         if (SaveAll) {
-            cudaMemcpy(deviceAllData, hostAllData, 3 * iter * size * sizeof(double), cudaMemcpyHostToDevice);
+            cudaMemcpy(deviceAllData, hostAllData, 3 * iter * size * SOD, cudaMemcpyHostToDevice);
         } else {
-            cudaMemcpy(deviceAllData, hostAllData, 3 * sizeof(double), cudaMemcpyHostToDevice);
+            cudaMemcpy(deviceAllData, hostAllData, 3 * SOD, cudaMemcpyHostToDevice);
         }
-        cudaMemcpy(deviceReflections, hostReflections, 3 * iter * size * sizeof(double), cudaMemcpyHostToDevice);
-        cudaMemcpy(deviceURef, hosturef, 3 * iter * size * sizeof(double), cudaMemcpyHostToDevice);
+        cudaMemcpy(deviceReflections, hostReflections, 3 * iter * size * SOD, cudaMemcpyHostToDevice);
+        cudaMemcpy(deviceURef, hosturef, 3 * iter * size * SOD, cudaMemcpyHostToDevice);
+        cudaMemcpy(deviceFlip, hostFlip, 3 * size * SOI, cudaMemcpyHostToDevice);
+
+        // signal variables
+        cudaMemcpy(deviceT2, hostT2, Nc * SOD, cudaMemcpyHostToDevice);
+        cudaMemcpy(deviceT, hostT, Nc * SOD, cudaMemcpyHostToDevice);
+
+        cudaMemcpy(deviceSigRe, hostSigRe, Nbvec * iter * SOD, cudaMemcpyHostToDevice);
+        cudaMemcpy(deviceSig0, hostSig0, Nc * iter * SOD, cudaMemcpyHostToDevice);
+        cudaMemcpy(devicebvec, hostbvec, Nbvec * 3 * SOD, cudaMemcpyHostToDevice);
+        cudaMemcpy(devicebval, hostbval, Nbvec * SOD, cudaMemcpyHostToDevice);
+        cudaMemcpy(deviceTD, hostTD, Nbvec * SOD, cudaMemcpyHostToDevice);
+
     }
 
     // option for printing in kernel
@@ -866,8 +954,10 @@ int main(int argc, char *argv[]) {
     {
 
         simulate<<<grid, block>>>(deviceAllData, devicedx2, devicedx4, deviceBounds, deviceState, deviceSimP,
-                                  deviced4Swc,
-                                  deviceNewLut, deviceNewIndex, deviceIndexSize, size, iter, debug, point, SaveAll,deviceReflections, deviceURef);
+                                  deviced4Swc, deviceNewLut, deviceNewIndex, deviceIndexSize, size, iter, debug, point,
+                                  SaveAll,
+                                  deviceReflections, deviceURef, deviceFlip, // reflection variables
+                                  deviceT2, deviceT, deviceSigRe, deviceSig0, devicebvec, devicebval, deviceTD); // signal variables
         cudaEventRecord(stop_c);
     }
 
@@ -886,16 +976,23 @@ int main(int argc, char *argv[]) {
     // cudaMemcpyDeviceToHost
     {
 
-        cudaMemcpy(hostdx2, devicedx2, 6 * iter * sizeof(double), cudaMemcpyDeviceToHost);
-        cudaMemcpy(hostdx4, devicedx4, 15 * iter * sizeof(double), cudaMemcpyDeviceToHost);
+        cudaMemcpy(hostdx2, devicedx2, 6 * iter * SOD, cudaMemcpyDeviceToHost);
+        cudaMemcpy(hostdx4, devicedx4, 15 * iter * SOD, cudaMemcpyDeviceToHost);
         if (SaveAll) {
-            cudaMemcpy(hostAllData, deviceAllData, 3 * iter * size * sizeof(double), cudaMemcpyDeviceToHost);
+            cudaMemcpy(hostAllData, deviceAllData, 3 * iter * size * SOD, cudaMemcpyDeviceToHost);
         } else {
-            cudaMemcpy(hostAllData, deviceAllData, 3 * sizeof(double), cudaMemcpyDeviceToHost);
+            cudaMemcpy(hostAllData, deviceAllData, 3 * SOD, cudaMemcpyDeviceToHost);
         }
-        cudaMemcpy(hostReflections, deviceReflections, 3 * iter * size * sizeof(double), cudaMemcpyDeviceToHost);
-        cudaMemcpy(hosturef, deviceURef, 3 * iter * size * sizeof(double), cudaMemcpyDeviceToHost);
-        // cudaMemcpy(hostInitPos, deviceInitPos, 3 * size * sizeof(double), cudaMemcpyDeviceToHost);
+        // Reflection Variables
+        cudaMemcpy(hostReflections, deviceReflections, 3 * iter * size * SOD, cudaMemcpyDeviceToHost);
+        cudaMemcpy(hosturef, deviceURef, 3 * iter * size * SOD, cudaMemcpyDeviceToHost);
+        cudaMemcpy(hostFlip, deviceFlip, 3 * size * SOI, cudaMemcpyDeviceToHost);
+
+        // Signal Variables
+        cudaMemcpy(hostT2, deviceT2, Nc * SOD, cudaMemcpyDeviceToHost);
+        cudaMemcpy(hostT, deviceT, Nc * SOD, cudaMemcpyDeviceToHost);
+        cudaMemcpy(hostSigRe, deviceSigRe, Nbvec * iter * SOD, cudaMemcpyDeviceToHost);
+        cudaMemcpy(hostSig0, deviceSig0, Nc * iter * SOD, cudaMemcpyDeviceToHost);
     }
 
     cudaEventSynchronize(stop_c);
@@ -915,11 +1012,23 @@ int main(int argc, char *argv[]) {
         cudaFree(devicedx4);
         cudaFree(deviceSimP);
         cudaFree(deviced4Swc);
+        cudaFree(deviceNewLut);
         cudaFree(deviceNewIndex);
         cudaFree(deviceIndexSize);
         cudaFree(deviceAllData);
+        // Reflection Variables
         cudaFree(deviceReflections);
         cudaFree(deviceURef);
+        cudaFree(deviceFlip);
+        // Signal Variables
+        cudaFree(deviceT2);
+        cudaFree(deviceT);
+        cudaFree(deviceSigRe);
+        cudaFree(deviceSig0);
+        cudaFree(devicebvec);
+        cudaFree(devicebval);
+        cudaFree(deviceTD);
+
     }
 
 
@@ -933,11 +1042,23 @@ int main(int argc, char *argv[]) {
         cudaFree(devicedx4);
         cudaFree(deviceSimP);
         cudaFree(deviced4Swc);
+        cudaFree(deviceNewLut);
         cudaFree(deviceNewIndex);
         cudaFree(deviceIndexSize);
         cudaFree(deviceAllData);
+        // Reflection Variables
         cudaFree(deviceReflections);
         cudaFree(deviceURef);
+        cudaFree(deviceFlip);
+        // Signal Variables
+        cudaFree(deviceT2);
+        cudaFree(deviceT);
+        cudaFree(deviceSigRe);
+        cudaFree(deviceSig0);
+        cudaFree(devicebvec);
+        cudaFree(devicebval);
+        cudaFree(deviceTD);
+
     }
 
     auto t2 = high_resolution_clock::now();
@@ -956,22 +1077,33 @@ int main(int argc, char *argv[]) {
         if (SaveAll) {
             allDataPath.append("/allData.bin");
             FILE *outFile = fopen(allDataPath.c_str(), "wb");
-            fwrite(hostAllData, sizeof(double), iter * size * 3, outFile);
+            fwrite(hostAllData, SOD, iter * size * 3, outFile);
             fclose(outFile);
         }
         std::string reflectionsPath = outpath;
         reflectionsPath.append("/reflections.bin");
         FILE *outFile = fopen(reflectionsPath.c_str(), "wb");
-        fwrite(hostReflections, sizeof(double), iter * size * 3, outFile);
+        fwrite(hostReflections, SOD, iter * size * 3, outFile);
         fclose(outFile);
 
         std::string urefPath = outpath;
         urefPath.append("/uref.bin");
         outFile = fopen(urefPath.c_str(), "wb");
-        fwrite(hosturef, sizeof(double), iter * size * 3, outFile);
+        fwrite(hosturef, SOD, iter * size * 3, outFile);
         fclose(outFile);
 
+        // write sig0 and sigRe
+        std::string sig0Path = outpath;
+        sig0Path.append("/sig0.bin");
+        outFile = fopen(sig0Path.c_str(), "wb");
+        fwrite(hostSig0, SOD, Nc * iter, outFile);
+        fclose(outFile);
 
+        std::string sigRePath = outpath;
+        sigRePath.append("/sigRe.bin");
+        outFile = fopen(sigRePath.c_str(), "wb");
+        fwrite(hostSigRe, SOD, Nbvec * iter, outFile);
+        fclose(outFile);
     }
 
     t2 = high_resolution_clock::now();
@@ -995,25 +1127,20 @@ int main(int argc, char *argv[]) {
         free(mdx2);
         free(mdx4);
         free(hostAllData);
+
+        // Reflection Variables
         free(hostReflections);
         free(hosturef);
+        free(hostFlip);
 
-    }
-
-    printf("Done!\n");
-        free(hostBounds);
-        free(hostdx2);
-        free(hostdx4);
-        free(hostSimP);
-        free(hostD4Swc);
-        free(hostNewIndex);
-        free(hostIndexSize);
-        free(mdx2);
-        free(mdx4);
-        free(hostAllData);
-        free(hostReflections);
-        free(hosturef);
-
+        // Signal Variables
+        free(hostT2);
+        free(hostT);
+        free(hostSigRe);
+        free(hostSig0);
+        free(hostbvec);
+        free(hostbval);
+        free(hostTD);
     }
 
     printf("Done!\n");
