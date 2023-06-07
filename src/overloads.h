@@ -127,9 +127,9 @@ __device__ double distance2(const double4 &lhs, const double4 &rhs);
 // set (double &lhs, int3 &index, double3 &values);
 //////////////////////////////////////////
 
-__device__ void set(double &lhs, int3 &index, double3 &values);
+__device__ void set(double *lhs, int3 &index, double3 &values);
 
-__device__ void operator=(double * lhs, const double3 &rhs, const int3 &index) {
+
 
 
 

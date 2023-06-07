@@ -223,14 +223,11 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
         count += 1;
 
         // store the intersection point
-        reflections[did[3].x] = intersectionPoint.x;
-        reflections[did[3].y] = intersectionPoint.y;
-        reflections[did[3].z] = intersectionPoint.z;
+        set(reflections, did[3], intersectionPoint);
 
         // store the unreflected vector
-        uref[did[3].x] = unreflected.x;
-        uref[did[3].y] = unreflected.y;
-        uref[did[3].z] = unreflected.z;
+        set(uref, did[3], unreflected);
+
 
         // Update the particle's position
         nextpos = intersectionPoint + reflectionVector;
@@ -434,14 +431,7 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 did[1] = make_int3(gid, i, 1);
                 did[2] = make_int3(gid, i, 2);
                 did[3] = make_int3(s2i(did[0], dix), s2i(did[1], dix), s2i(did[2], dix));
-
-
-                // todo create an indexing overload for this
-                // function should look like setfromd3(double * data, int3 index, double3 value)
-
-                savedata[did[3].x] = A.x;
-                savedata[did[3].y] = A.y;
-                savedata[did[3].z] = A.z;
+                set(savedata, did[3], A);
             }
 
             // Store Tensor Data
