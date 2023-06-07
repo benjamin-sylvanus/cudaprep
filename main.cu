@@ -108,7 +108,6 @@ __device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos
             }
         }
             // if the value of the index array is -1 we have checked all pairs for this particle.
-            // checkme: how often does this happen?
         else {
             // end for p loop
             return false;
@@ -222,12 +221,9 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
         printf("Count: %d\n", count);
         count += 1;
 
-        // store the intersection point
+        // store the intersection point and unreflected position
         set(reflections, did[3], intersectionPoint);
-
-        // store the unreflected vector
         set(uref, did[3], unreflected);
-
 
         // Update the particle's position
         nextpos = intersectionPoint + reflectionVector;
@@ -297,16 +293,6 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
         bool flag;
         double step = step_size;
 
-        /////////////////////
-        // signal variables
-        {
-            /*
-             * double s0 = 0; // Signal weighted by T2 relaxation
-             * double t[Nc_max] = {0}; // The time staying in compartments
-            */
-        }
-        ////////////////////
-
         // init local state var
         curandStatePhilox4_32_10_t localstate = state[gid];
         xi = curand_uniform4_double(&localstate);
@@ -324,7 +310,6 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
         flag = false;
 
         // state is based on intialization conditions if particles are required to start inside then parstate -> [1,1]
-        // todo figure out how to get parstate from init position function... requires a global parstate.
         parstate = make_int2(1, 1);
 
         // parlut defines whether particle is within bounds of LUT
@@ -344,10 +329,7 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 // determine if step executes
                 completes = xi.w < perm_prob;
 
-                // set next position
-
-                // TODO Write Function
-                // Should look like computeNext(A, step, xi, nextpos);
+                // compute next position
                 double pi = PI;
                 computeNext(A, step, xi, nextpos, pi);
 
@@ -374,16 +356,6 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 * @cases particle inside? 1 1 - update
                 */
 
-                ////////////////////////////////////////////////////////////////
-                // ========================================================== //
-                // ========================================================== //
-                ////////////////////////////////////////////////////////////////
-                ///////////////// UPDATE PARTICLE COMPARTMENT //////////////////
-                ////////////////////////////////////////////////////////////////
-                // ========================================================== //
-                // ========================================================== //
-                ////////////////////////////////////////////////////////////////
-
                 // particle inside: [0 0] || [1 1]
                 if (parstate.x == parstate.y) { A = nextpos; }
 
@@ -407,6 +379,7 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                     }
                 }
             } else {
+
                 // update flag for next step
                 flag = false;
             }
@@ -421,22 +394,9 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 did[3] = make_int3(s2i(did[0], dix), s2i(did[1], dix), s2i(did[2], dix));
                 set(savedata, did[3], A);
             }
-
             // Store Tensor Data
             {
-
                 diffusionTensor(&A, &xnot, vsize, dx2, dx4, &d2, i, gid, iter, size);
-                ////////////////////////////////////////////////////////////////
-                // ========================================================== //
-                // ========================================================== //
-                ////////////////////////////////////////////////////////////////
-                ///////////////////////// SIGNAL ///////////////////////////////
-                ////////////////////////////////////////////////////////////////
-                // ========================================================== //
-                // ========================================================== //
-                ////////////////////////////////////////////////////////////////
-                ////////////////////////////////////////////////////////////////
-
                 // Signal
                 /*{
                     // loop over compartments
@@ -470,22 +430,6 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                         // qx = sqrt(bval[j] / TD[tidx]) * (dx * bvec[j * 3 + 0] + dy * bvec[j * 3 + 1] + dz * bvec[j * 3 + 2]);
                         atomAdd(&sigRe[Nbvec * tidx + j], s0 * cos(qx));
                     }
-
-                    Sizes:
-                    Nc: Number of Compartments
-                    * t
-                    * T2
-
-                    Nbvec: Number of b values
-                    * bvec
-                    * bval
-                    * TD
-
-                    i: steps
-                    * sigRe
-                    * sig0
-
-
                 }*/
             }
         }
@@ -509,11 +453,9 @@ int main(int argc, char *argv[]) {
      */
     // Parse Arguments
     if (argc < 2) {
-        // "/autofs/space/symphony_002/users/BenSylvanus/cuda/Sims/data"
         path = "/autofs/space/symphony_002/users/BenSylvanus/cuda/Sims";
         std::string InPath = path;
         std::string OutPath = path;
-
         InPath.append("/data");
         OutPath.append("/results");
         control.Setup(InPath, OutPath, 0);
@@ -534,14 +476,6 @@ int main(int argc, char *argv[]) {
     std::vector<double> simulationparams = sim.getParameterdata();
     SaveAll = sim.getSaveAll();
 
-    if (SaveAll) {
-        printf("Executed True\n");
-
-    } else {
-        printf("Executed False\n");
-    }
-
-
     for (int i = 0; i < 10; i++) {
         double value = simulationparams[i];
         simparam[i] = value;
@@ -558,43 +492,6 @@ int main(int argc, char *argv[]) {
     int prod = (int) (boundx * boundy * boundz);
     std::vector<double> r_swc = sim.getSwc();
     int nrow = r_swc.size() / 6;
-
-    //old comments
-    {
-        /** 
-         * @brief Simulation Params Array
-         * <li> particle_num = SimulationParams[0] </li>
-         * <li> step_num = SimulationParams[1] </li>
-         * <li> step_size = SimulationParams[2] </li>
-         * <li> perm_prob = SimulationParams[3] </li>
-         * <li> init_in = SimulationParams[4] </li>
-         * <li> D0 = SimulationParams[5] </li>
-         * <li> d = SimulationParams[6] </li>
-         * <li> scale = SimulationParams[7] </li>
-         * <li> tstep = SimulationParams[8] </li>
-         * <li> vsize = SimulationParams[9] </li>
-         * @brief INDEXING SWC ARRAY
-         * index + (dx*0:5);
-         * row+(nrow*col)
-         * Example: nrow = 10; get all elements from row 1;
-         * swc[1,0:5] ---->
-         * <li> swc(1,0) = swc[1+10*0];</li>
-         * <li> swc(1,1) = swc[1+10*1];</li>
-         * <li> swc(1,2) = swc[1+10*2];</li>
-         * <li> swc(1,3) = swc[1+10*3];</li>
-         * <li> swc(1,4) = swc[1+10*4];</li>
-         * <li> swc(1,5) = swc[1+10*5];</li>
-         */
-        //we only need the x y z r    float milliseconds = 0; of our swc array.
-        // stride + bx * (by * y + z) + x
-        // int id0 = 0 + (boundx) * ((boundy) * 2 + 2) + 3;
-        // printf("lut[%d]: %d\n", id0, lut[id0]);
-        // ----------------------
-        // Lookup Table Summary
-        // linearindex = stride + bx * (by * z + y) + x
-        // voxel coord: (x,y,z);
-        // ----------------------
-    }
 
     double4 swc_trim[nrow];
     double w_swc[nrow * 4];
@@ -649,28 +546,6 @@ int main(int argc, char *argv[]) {
     double *hosturef;
     int* hostFlip;
 
-    // signal variables
-    /*
-    Sizes:
-    Nc: Number of Compartments
-    * t * 1
-    * T2 * 1
-
-    Nbvec: Number of b values
-    * bvec * 3
-    * bval * 1
-    * TD * 1
-
-    i: steps
-    * sigRe Nbvec * i
-    * sig0 Nc * i
-    *
-
-    // sum of all signals per time step per b value
-
-    &sigRe[Nbvec * tidx + j], s0 * cos(qx));
-    */
-
     double *hostT2; // Nc * 1
     double *hostT; // Nc * 1
     double *hostSigRe; // Nbvec * iter
@@ -678,8 +553,6 @@ int main(int argc, char *argv[]) {
     double *hostbvec; // Nbvec * 3 (x,y,z)
     double *hostbval; // Nbvec * 1 (b)
     double *hostTD; // Nbvec * 1 (TD)
-
-
 
     // Alloc Memory for Host Pointers
     {
