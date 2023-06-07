@@ -348,7 +348,8 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
 
                 // TODO Write Function
                 // Should look like computeNext(A, step, xi, nextpos);
-                computeNext(A, step, xi, nextpos, PI);
+                double pi = PI;
+                computeNext(A, step, xi, nextpos, pi);
 
                 // check coordinate validity
                 validCoord(nextpos, A, b_int3, upper, lower, floorpos, Reflections, Uref, gid, i, size, iter, flip);
