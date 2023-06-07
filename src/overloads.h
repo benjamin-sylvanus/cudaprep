@@ -100,5 +100,18 @@ __device__ double length(const double3 &lhs);
 
 __device__ double3 normalize(const double3 &lhs);
 
+//////////////////////////////////////////
+// distance: double3
+//////////////////////////////////////////
+
+__device__ double distance2(const double3 &lhs, const double3 &rhs);
+
+//////////////////////////////////////////
+// distance: double4
+//////////////////////////////////////////
+
+__device__ double distance2(const double4 &lhs, const double4 &rhs);
+
+
 
 #endif //CUDAPREP_U_OVERLOADS_H
