@@ -89,7 +89,11 @@ __device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos
             parent = d4swc[vindex.y];
 
             // calculate euclidean distance
+
+            dist2 = distance(parent, child);
+            printf("dist via new method: %f\n", dist2);
             dist2 = pow(parent.x - child.x, 2) + pow(parent.y - child.y, 2) + pow(parent.z - child.z, 2);
+            printf("dist via old method: %f\n", dist2);
 
             // determine whether particle is inside this connection
             bool inside = swc2v(nextpos, child, parent, dist2);
@@ -190,8 +194,7 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
         }
         else
         {
-            // this should break the loop.....
-            return;
+            return; // no reflection needed
         }
 
         // Calculate D  (Ax + By + Cz + D = 0)
@@ -349,10 +352,10 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
                 completes = xi.w < perm_prob;
 
                 /**
-                * particle inside? 0 0 - update
-                * particle inside? 0 1 - check if updates
-                * particle inside? 1 0 - check if updates
-                * particle inside? 1 1 - update
+                * @cases particle inside? 0 0 - update
+                * @cases particle inside? 0 1 - check if updates
+                * @cases particle inside? 1 0 - check if updates
+                * @cases particle inside? 1 1 - update
                 */
 
                 ////////////////////////////////////////////////////////////////
