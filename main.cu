@@ -151,10 +151,8 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
     int count = 0;
     while(true)
     {
-
-        // TODO implement comparision double3 to double3
-        int3 UPPER = make_int3(nextpos.x > High.x, nextpos.y > High.y, nextpos.z > High.z);
-        int3 LOWER = make_int3(nextpos.x < Low.x, nextpos.y < Low.y, nextpos.z < Low.z);
+        int3 UPPER = nextpos > High;
+        int3 LOWER = nextpos < Low;
 
         // normal vector
         double3 normal;

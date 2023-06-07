@@ -81,6 +81,17 @@ __device__ double3 operator/=(double3 &lhs, const double3 &rhs);
 
 __device__ double3 operator/=(double3 &lhs, const double &rhs);
 
+//////////////////////////////////////////
+// > operator overloads
+//////////////////////////////////////////
+
+__device__ int3 operator>(const double3 &lhs, const double3 &rhs);
+
+//////////////////////////////////////////
+// < operator overloads
+//////////////////////////////////////////
+
+__device__ int3 operator<(const double3 &lhs, const double3 &rhs);
 
 //////////////////////////////////////////
 // dot product
@@ -111,6 +122,16 @@ __device__ double distance2(const double3 &lhs, const double3 &rhs);
 //////////////////////////////////////////
 
 __device__ double distance2(const double4 &lhs, const double4 &rhs);
+
+//////////////////////////////////////////
+// set (double &lhs, int3 &index, double3 &values);
+//////////////////////////////////////////
+
+__device__ void set(double &lhs, int3 &index, double3 &values);
+
+__device__ void operator=(double * lhs, const double3 &rhs, const int3 &index) {
+
+
 
 
 
