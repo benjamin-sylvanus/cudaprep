@@ -25,6 +25,7 @@
 #define CUDART_PI_F 3.141592654f
 #define PI 3.14159265358979323846
 #define LDPI 3.141592653589793238462643383279502884L
+#define timepoints 1000
 #define Nc 2
 #define Nbvec 3
 #define SOD (sizeof(double))
@@ -65,173 +66,9 @@ __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long se
     curand_init(seed, idx, 0, &state[idx]);
 }
 
-/**
- * @brief Checks if the particle is inside the connections listed for voxel
- * @param i_int3 size of the index array
- * @param test_lutvalue index of the voxel
- * @param nextpos position of the particle
- * @param NewIndex index array
- * @param d4swc swc array
- * @return true if particle is inside the connection
- */
-__device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos, int *NewIndex, double4 *d4swc) {
-    int3 vindex;
-    double4 child, parent;
-    double dist2;
 
-    // for each connection check if particle inside
-    for (int page = 0; page < i_int3.z; page++) {
 
-        // create a subscript indices
-        int3 c_new = make_int3(test_lutvalue, 0, page);
-        int3 p_new = make_int3(test_lutvalue, 1, page);
 
-        // convert subscripted index to linear index and get value from Index Array
-        vindex.x = NewIndex[s2i(c_new, i_int3)] - 1;
-        vindex.y = NewIndex[s2i(p_new, i_int3)] - 1;
-
-        if ((vindex.x) != -1) {
-            //extract child parent values from swc
-            child = d4swc[vindex.x];
-            parent = d4swc[vindex.y];
-
-            // calculate euclidean distance
-            dist2 = distance2(parent, child);
-
-            // determine whether particle is inside this connection
-            bool inside = swc2v(nextpos, child, parent, dist2);
-
-            // if it is inside the connection we don't need to check the remaining.
-            if (inside) {
-                // end for p loop
-                return true;
-            }
-        }
-            // if the value of the index array is -1 we have checked all pairs for this particle.
-        else {
-            // end for p loop
-            return false;
-        }
-    }
-    return false;
-}
-/**
- * @brief Checks the validity of the next position and updates the position and next position accordingly.
- * @param nextpos next position
- * @param pos current position
- * @param b_int3 bounding box
- * @param upper upper bound
- * @param lower lower bound
- * @param floorpos floor position
- * @param reflections reflection storage
- * @param uref reflection storage
- * @param gid particle id
- * @param i step id
- * @param size number of particles
- * @param iter number of iterations
- * @param flips reflection counter
- */
-__device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &upper, int3 &lower, int3 &floorpos,
-                           double * reflections, double * uref, int gid, int i, int size, int iter, int * flips)
-{
-    double3 High = make_double3((double)b_int3.x, (double)b_int3.y, (double) b_int3.z);
-    double3 Low = make_double3(0.0, 0.0, 0.0);
-
-    // determine the index of the reflection storage should match the save data index
-    int3 dix = make_int3(size, iter, 3);
-    int3 did[4];
-    did[0] = make_int3(gid, i, 0);
-    did[1] = make_int3(gid, i, 1);
-    did[2] = make_int3(gid, i, 2);
-    did[3] = make_int3(s2i(did[0], dix), s2i(did[1], dix), s2i(did[2], dix));
-
-    int fidx; // flip index for reflection
-
-    int count = 0;
-    while(true)
-    {
-        int3 UPPER = nextpos > High;
-        int3 LOWER = nextpos < Low;
-
-        // normal vector
-        double3 normal;
-
-        // point on plane
-        double3 pointOnPlane;
-
-        if (LOWER.x)
-        {
-            fidx = 6*gid + 0;
-            pointOnPlane = make_double3(Low.x, nextpos.y, nextpos.z);
-            normal = make_double3(1.0, 0.0, 0.0);
-        }
-        else if (UPPER.x)
-        {
-            fidx = 6*gid + 1;
-            pointOnPlane = make_double3(High.x, nextpos.y, nextpos.z);
-            normal = make_double3(-1.0, 0.0, 0.0);
-        }
-        else if (LOWER.y)
-        {
-            fidx = 6*gid + 2;
-            pointOnPlane = make_double3(nextpos.x, Low.y, nextpos.z);
-            normal = make_double3(0.0, 1.0, 0.0);
-        }
-        else if (UPPER.y)
-        {
-            fidx = 6*gid + 3;
-            pointOnPlane = make_double3(nextpos.x, High.y, nextpos.z);
-            normal = make_double3(0.0, -1.0, 0.0);
-        }
-        else if (LOWER.z)
-        {
-            fidx = 6*gid + 4;
-            pointOnPlane = make_double3(nextpos.x, nextpos.y, Low.z);
-            normal = make_double3(0.0, 0.0, 1.0);
-        }
-        else if (UPPER.z)
-        {
-            fidx = 6*gid + 5;
-            pointOnPlane = make_double3(nextpos.x, nextpos.y, High.z);
-            normal = make_double3(0.0, 0.0, -1.0);
-        }
-        else
-        {
-            return; // no reflection needed
-        }
-
-        // Calculate D  (Ax + By + Cz + D = 0)
-        double D = -(dot(normal, pointOnPlane));
-
-        double3 intersectionPoint;
-        double3 d = pos - nextpos;
-
-        double t1 = -((dot(normal, nextpos) + D)) / dot(normal, d);
-        intersectionPoint = nextpos + d * t1;
-
-        double3 reflectionVector = nextpos - intersectionPoint;
-        reflectionVector = reflectionVector - normal * (2 * dot(reflectionVector,normal));
-
-        // record the unreflected position
-        double3 unreflected = nextpos;
-        double3 intersection = intersectionPoint;
-        nextpos = intersectionPoint + reflectionVector;
-
-        printf("NextPos: %f %f %f -> %f %f %f\n", nextpos.x, nextpos.y, nextpos.z, intersectionPoint.x+reflectionVector.x, intersectionPoint.y + reflectionVector.y, intersectionPoint.z + reflectionVector.z);
-        printf("Count: %d\n", count);
-        count += 1;
-
-        // store the intersection point and unreflected position
-        set(reflections, did[3], intersectionPoint);
-        set(uref, did[3], unreflected);
-
-        // Update the particle's position
-        nextpos = intersectionPoint + reflectionVector;
-
-        // flip the particle's direction
-        flips[fidx] += 1; // no need for atomicAdd since gid is what is parallelized
-    }
-}
 
 
 /**
@@ -262,9 +99,9 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
  * @param BVal - the BVal data
  * @param TD - the TD data
  */
-__global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds, curandStatePhilox4_32_10_t *state,
+__global__ void simulate(double *savedata, double *dx2, double *dx4, int3 *Bounds, curandStatePhilox4_32_10_t *state,
                          double *SimulationParams,
-                         double4 *d4swc, int *nlut, int *NewIndex, int *IndexSize, int size, int iter, bool debug,
+                         double4 *d4swc, int *nlut, int *NewIndex, int3 *IndexSize, int size, int iter, bool debug,
                          double3 point, int SaveAll, double * Reflections, double * Uref, int * flip,
                          double * T2, double * T, double * Sig0, double * SigRe, double* BVec, double * BVal, double * TD) {
 
@@ -283,10 +120,9 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
         int3 upper;
         int3 lower;
         int3 floorpos;
-
-        // TODO convert these to int3 before we pass them in
-        int3 b_int3 = make_int3(Bounds[0], Bounds[1], Bounds[2]);
-        int3 i_int3 = make_int3(IndexSize[0], IndexSize[1], IndexSize[2]);
+        int3 b_int3 = Bounds;
+        int3 i_int3 = IndexSize;
+        _T2 = make_double3(80,80,80);
 
         double3 d2 = make_double3(0.0, 0.0, 0.0);
         bool completes;
@@ -397,22 +233,25 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int *Bounds
             // Store Tensor Data
             {
                 diffusionTensor(&A, &xnot, vsize, dx2, dx4, &d2, i, gid, iter, size);
+                // https://github.com/NYU-DiffusionMRI/monte-carlo-simulation-3D-RMS/blob/master/part1_demo3_simulation.m
                 // Signal
-                /*{
+
                     // loop over compartments
                     s0 = 0.0;
                     for (int j = 0; j < Nc; j++) {
-                        // sum over all compartments
-                        s0 = s0 + (t[j] / T2[j]);
+                        /**
+                         * @var s0 is our summation variable
+                         * @var t[j] is the time in compartment j
+                         * @var T2 is the T2 Relaxation in Compartment j
+                         */
+                        s0 = s0 + (t[j]/_T2[j]); // TODO implement "t" as time in each compartment
                     }
 
                     s0 = exp(-1.0 * s0);
+                    //  tidx=i/Tstep; atomicAdd(&sig0[tidx], s0);
+                    atomicAdd(&sig0[i],s0);
 
-                    // sig0 is the sum of all compartments
-                    atomicAdd(&sig0[tidx], s0);
-
-                    // atomAdd(&sig0[tidx], s0);
-
+                /*{
                     // loop over b values
                     for (int j = 0; j < Nbvec; j++) {
                         // bval is the b value
@@ -461,7 +300,6 @@ int main(int argc, char *argv[]) {
         control.Setup(InPath, OutPath, 0);
         control.start();
     } else {
-
         control.Setup(argc, argv, 1);
     }
 
@@ -531,13 +369,13 @@ int main(int argc, char *argv[]) {
      * - Set Values
      */
     // Create Host Pointers
-    int *hostBounds;
+    int3 *hostBounds;
     double *hostdx2;
     double *hostdx4;
     double *hostSimP;
     int *hostNewLut;
     int *hostNewIndex;
-    int *hostIndexSize;
+    int3 *hostIndexSize;
     double4 *hostD4Swc;
     double *mdx2;
     double *mdx4;
@@ -545,26 +383,28 @@ int main(int argc, char *argv[]) {
     double *hostReflections;
     double *hosturef;
     int* hostFlip;
-
     double *hostT2; // Nc * 1
     double *hostT; // Nc * 1
     double *hostSigRe; // Nbvec * iter
     double *hostSig0; // Nc * iter
     double *hostbvec; // Nbvec * 3 (x,y,z)
     double *hostbval; // Nbvec * 1 (b)
-    double *hostTD; // Nbvec * 1 (TD)
+    double *hostTD;   //
+
+    // TD is the time elapsed at timepoint i.
+
 
     // Alloc Memory for Host Pointers
     {
 
-        hostBounds = (int *) malloc(3 * SOI);
+        hostBounds = (int3 *) malloc(SOI3);
         hostdx2 = (double *) malloc(6 * iter * SOD);
         hostdx4 = (double *) malloc(15 * iter * SOD);
         hostSimP = (double *) malloc(10 * SOD);
         hostD4Swc = (double4 *) malloc(nrow * SOD4);
         hostNewLut = (int *) malloc(prod * SOI);
         hostNewIndex = (int *) malloc(newindexsize * SOI);
-        hostIndexSize = (int *) malloc(3 * SOI);
+        hostIndexSize = (int3 *) malloc(3SOI3);
         mdx2 = (double *) malloc(6 * iter * SOD);
         mdx4 = (double *) malloc(15 * iter * SOD);
         if (SaveAll) {
@@ -584,16 +424,15 @@ int main(int argc, char *argv[]) {
         hostbvec = (double *) malloc(Nbvec * 3 * SOD);
         hostbval = (double *) malloc(Nbvec * SOD);
         hostTD = (double *) malloc(Nbvec * SOD);
-
         printf("Allocated Host Data\n");
     }
 
     // Set Values for Host
     {
 
-        hostBounds[0] = boundx;
-        hostBounds[1] = boundy;
-        hostBounds[2] = boundz;
+        hostBounds = make_int3(boundx,boundy,boundz);
+
+
         memset(hostdx2, 0.0, 6 * iter * SOD);
         memset(hostdx4, 0.0, 15 * iter * SOD);
         {
@@ -603,9 +442,9 @@ int main(int argc, char *argv[]) {
             }
     {
 
-        hostBounds[0] = boundx;
-        hostBounds[1] = boundy;
-        hostBounds[2] = boundz;
+        hostBounds = make_int3(boundx,boundy,boundz);
+
+
         memset(hostdx2, 0.0, 6 * iter * SOD);
         memset(hostdx4, 0.0, 15 * iter * SOD);
         {
@@ -636,13 +475,10 @@ int main(int argc, char *argv[]) {
                 int value = indexarr[i];
                 hostNewIndex[i] = value;
             }
-
-            for (int i = 0; i < 3; i++) {
-                int value = index_dims[i];
-                hostIndexSize[i] = value;
-            }
-
         }
+
+        hostIndexSize = make_int3(index_dims[0],index_dims[1], index_dims[2]);
+
         memset(mdx2, 0.0, 6 * iter * SOD);
         memset(mdx4, 0.0, 15 * iter * SOD);
 
@@ -658,7 +494,6 @@ int main(int argc, char *argv[]) {
         // signal variables
         memset(hostT2, 0.0, Nc * SOD); // T2 is read from file?
         memset(hostT, 0.0, Nc * SOD); // T is set to 0.0
-
         memset(hostSigRe, 0.0, Nbvec * iter * SOD); // Calculated in kernel
         memset(hostSig0, 0.0, Nc * iter * SOD); // Calculated in kernel
         memset(hostbvec, 0.0, Nbvec * 3 * SOD); // bvec is read from file
@@ -677,12 +512,12 @@ int main(int argc, char *argv[]) {
     curandStatePhilox4_32_10_t *deviceState;
     double *devicedx2;
     double *devicedx4;
-    int *deviceBounds;
+    int3 *deviceBounds;
     double *deviceSimP;
     double4 *deviced4Swc;
     int *deviceNewLut;
     int *deviceNewIndex;
-    int *deviceIndexSize;
+    int3 *deviceIndexSize;
     double *deviceAllData;
     double *deviceReflections;
     double *deviceURef;
@@ -691,7 +526,6 @@ int main(int argc, char *argv[]) {
     // signal variables
     double *deviceT2;
     double *deviceT;
-
     double *deviceSigRe;
     double *deviceSig0;
     double *devicebvec;
@@ -708,13 +542,13 @@ int main(int argc, char *argv[]) {
 
         gpuErrchk(cudaMalloc((double **) &devicedx2, 6 * iter * SOD));
         gpuErrchk(cudaMalloc((double **) &devicedx4, 15 * iter * SOD));
-        gpuErrchk(cudaMalloc((int **) &deviceBounds, 3 * SOI));
+        gpuErrchk(cudaMalloc((int3 **) &deviceBounds, SOI3));
         gpuErrchk(cudaMalloc((curandStatePhilox4_32_10_t * *) & deviceState, size * sizeof(curandStatePhilox4_32_10_t)));
         gpuErrchk(cudaMalloc((double **) &deviceSimP, 10 * SOD));
         gpuErrchk(cudaMalloc((double4 * *) & deviced4Swc, nrow * SOD4));
         gpuErrchk(cudaMalloc((int **) &deviceNewLut, prod * SOI));
         gpuErrchk(cudaMalloc((int **) &deviceNewIndex, newindexsize * SOI));
-        gpuErrchk(cudaMalloc((int **) &deviceIndexSize, 3 * SOI));
+        gpuErrchk(cudaMalloc((int3 **) &deviceIndexSize, SOI3));
         if (SaveAll) {
             gpuErrchk(cudaMalloc((double **) &deviceAllData, 3 * iter * size * SOD));
         } else {
@@ -727,7 +561,6 @@ int main(int argc, char *argv[]) {
         // signal variables
         gpuErrchk(cudaMalloc((double **) &deviceT2, Nc * SOD));
         gpuErrchk(cudaMalloc((double **) &deviceT, Nc * SOD));
-
         gpuErrchk(cudaMalloc((double **) &deviceSigRe, Nbvec * iter * SOD));
         gpuErrchk(cudaMalloc((double **) &deviceSig0, Nc * iter * SOD));
         gpuErrchk(cudaMalloc((double **) &devicebvec, Nbvec * 3 * SOD));
@@ -741,7 +574,7 @@ int main(int argc, char *argv[]) {
         printf("Copying Host data to Device\n");
         gpuErrchk(cudaMemcpy(devicedx2, hostdx2, 6 * iter * SOD, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(devicedx4, hostdx4, 15 * iter * SOD, cudaMemcpyHostToDevice));
-        gpuErrchk(cudaMemcpy(deviceBounds, hostBounds, 3 * SOI, cudaMemcpyHostToDevice));
+        gpuErrchk(cudaMemcpy(deviceBounds, hostBounds, SOI3, cudaMemcpyHostToDevice));
 
         setup_kernel<<<grid, block>>>(deviceState, 1);
 
@@ -749,7 +582,7 @@ int main(int argc, char *argv[]) {
         gpuErrchk(cudaMemcpy(deviced4Swc, hostD4Swc, nrow * SOD4, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(deviceNewLut, hostNewLut, prod * SOI, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(deviceNewIndex, hostNewIndex, newindexsize * SOI, cudaMemcpyHostToDevice));
-        gpuErrchk(cudaMemcpy(deviceIndexSize, hostIndexSize, 3 * SOI, cudaMemcpyHostToDevice));
+        gpuErrchk(cudaMemcpy(deviceIndexSize, hostIndexSize, SOI3, cudaMemcpyHostToDevice));
         if (SaveAll) {
             gpuErrchk(cudaMemcpy(deviceAllData, hostAllData, 3 * iter * size * SOD, cudaMemcpyHostToDevice));
         } else {
@@ -762,7 +595,6 @@ int main(int argc, char *argv[]) {
         // signal variables
         gpuErrchk(cudaMemcpy(deviceT2, hostT2, Nc * SOD, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(deviceT, hostT, Nc * SOD, cudaMemcpyHostToDevice));
-
         gpuErrchk(cudaMemcpy(deviceSigRe, hostSigRe, Nbvec * iter * SOD, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(deviceSig0, hostSig0, Nc * iter * SOD, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(devicebvec, hostbvec, Nbvec * 3 * SOD, cudaMemcpyHostToDevice));
@@ -775,7 +607,6 @@ int main(int argc, char *argv[]) {
     bool debug = false;
     double3 point = make_double3(hostD4Swc[0].x, hostD4Swc[0].y, hostD4Swc[0].z);
 
-    double3 point = make_double3(hostD4Swc[0].x, hostD4Swc[0].y, hostD4Swc[0].z);
 
     /**
      * Call Kernel
@@ -912,12 +743,12 @@ int main(int argc, char *argv[]) {
             fwrite(hostAllData, SOD, iter * size * 3, outFile);
             fclose(outFile);
         }
+        // write reflections and uref
         std::string reflectionsPath = outpath;
         reflectionsPath.append("/reflections.bin");
         FILE *outFile = fopen(reflectionsPath.c_str(), "wb");
         fwrite(hostReflections, SOD, iter * size * 3, outFile);
         fclose(outFile);
-
         std::string urefPath = outpath;
         urefPath.append("/uref.bin");
         outFile = fopen(urefPath.c_str(), "wb");
@@ -930,7 +761,6 @@ int main(int argc, char *argv[]) {
         outFile = fopen(sig0Path.c_str(), "wb");
         fwrite(hostSig0, SOD, Nc * iter, outFile);
         fclose(outFile);
-
         std::string sigRePath = outpath;
         sigRePath.append("/sigRe.bin");
         outFile = fopen(sigRePath.c_str(), "wb");
@@ -974,7 +804,6 @@ int main(int argc, char *argv[]) {
         free(hostbval);
         free(hostTD);
     }
-
     printf("Done!\n");
     return 0;
 }

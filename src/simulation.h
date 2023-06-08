@@ -33,6 +33,18 @@ private:
     std::string resultPath;
     int SaveAll = 1;
 
+    // Signal Parameters
+    // TODO Implement Reads of Signal Data
+    std::vector<std::vector<uint64_t>> signalDims;
+
+
+    // t2 relaxation...
+    std::vector<double> T2; // TODO: Figure out what this is
+    std::vector<double> bvec; // Gradient Direction
+    std::vector<double> bval; // Gradient Strength
+
+
+
 public:
     // Constructors
     simulation(simreader reader, std::string outpath);
