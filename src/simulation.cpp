@@ -22,7 +22,7 @@ simulation::simulation(simreader reader, std::string outpath) {
     this->lut = reader.read<uint64_t>("/lut.bin");
     this->pairs = reader.read<uint64_t>("/pairs.bin");
     this->bounds = reader.read<uint64_t>("/bounds.bin");
-    this->arraydims = reader.readdims();
+    this->arraydims = reader.readdims("/dims.txt");
     this->particle_num = this->parameterdata[0];
     this->step_num = this->parameterdata[1];
     this->step_size = this->parameterdata[2];
@@ -34,6 +34,13 @@ simulation::simulation(simreader reader, std::string outpath) {
     this->tstep = this->parameterdata[8];
     this->vsize = this->parameterdata[9];
     this->resultPath = outpath;
+
+    // signal parameters
+    // this->signalDims = reader.readdims("/signalDims.txt");
+    //
+    // this->T2 = reader.read<uint64_t>("/T2.bin");
+    // this->bvec = reader.read<uint64_t>("/bvec.bin");
+    // this->bval = reader.read<uint64_t>("/bval.bin");
 }
 
 simulation::simulation()

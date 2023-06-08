@@ -27,7 +27,7 @@ public:
     template<class T>
     std::vector <T> read(std::string str);
 
-    std::vector <std::vector<uint64_t>> readdims();
+    std::vector <std::vector<uint64_t>> readdims(std::string str);
 
     std::vector<double> readconstants();
 
