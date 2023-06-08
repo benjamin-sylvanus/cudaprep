@@ -180,7 +180,8 @@ __device__ double3 initPosition(int gid, double *dx2, int *Bounds, curandStatePh
     return A;
 }
 
-__device__ void diffusionTensor(double3 * A, double3 * xnot, double vsize, double * dx2, double * dx4, double3 * d2, int i, int gid, int iter, int size) {
+__device__ void
+diffusionTensor(double3 * A, double3 * xnot, double vsize, double * dx2, double * dx4, double3 * d2, int i, int gid, int iter, int size) {
 
     d2->x = fabs((A->x - xnot->x) * vsize);
     d2->y = fabs((A->y - xnot->y) * vsize);
@@ -318,7 +319,6 @@ __host__ void writeResults(double * hostdx2, double * hostdx4, double * mdx2, do
   fclose(outFile);
 }
 
-
 __device__ void computeNext(double3 &A, double &step, double4 &xi, double3 &nextpos, double &pi) {
     double theta = 2 * pi * xi.x;
     double v = xi.y;
@@ -327,4 +327,138 @@ __device__ void computeNext(double3 &A, double &step, double4 &xi, double3 &next
     nextpos.x = A.x + (step * sin_phi * cos(theta));
     nextpos.y = A.y + (step * sin_phi * sin(theta));
     nextpos.z = A.z + (step * cos_phi);
+}
+
+__device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos, int *NewIndex, double4 *d4swc) {
+    int3 vindex;
+    double4 child, parent;
+    double dist2;
+
+    // for each connection check if particle inside
+    for (int page = 0; page < i_int3.z; page++) {
+
+        // create a subscript indices
+        int3 c_new = make_int3(test_lutvalue, 0, page);
+        int3 p_new = make_int3(test_lutvalue, 1, page);
+
+        // convert subscripted index to linear index and get value from Index Array
+        vindex.x = NewIndex[s2i(c_new, i_int3)] - 1;
+        vindex.y = NewIndex[s2i(p_new, i_int3)] - 1;
+
+        if ((vindex.x) != -1) {
+            //extract child parent values from swc
+            child = d4swc[vindex.x];
+            parent = d4swc[vindex.y];
+
+            // calculate euclidean distance
+            dist2 = distance2(parent, child);
+
+            // determine whether particle is inside this connection
+            bool inside = swc2v(nextpos, child, parent, dist2);
+
+            // if it is inside the connection we don't need to check the remaining.
+            if (inside) {
+                return true;
+            }
+        }
+            // if the value of the index array is -1 we have checked all pairs for this particle.
+        else {
+            return false;
+        }
+    }
+    return false;
+}
+
+
+__device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &upper, int3 &lower, int3 &floorpos,
+                           double * reflections, double * uref, int gid, int i, int size, int iter, int * flips) {
+    double3 High = make_double3((double)b_int3.x, (double)b_int3.y, (double) b_int3.z);
+    double3 Low = make_double3(0.0, 0.0, 0.0);
+
+    // determine the index of the reflection storage should match the save data index
+    int3 dix = make_int3(size, iter, 3);
+    int3 did[4];
+    did[0] = make_int3(gid, i, 0);
+    did[1] = make_int3(gid, i, 1);
+    did[2] = make_int3(gid, i, 2);
+    did[3] = make_int3(s2i(did[0], dix), s2i(did[1], dix), s2i(did[2], dix));
+
+    int fidx; // flip index for reflection
+
+    int count = 0;
+    while(true) {
+        int3 UPPER = nextpos > High;
+        int3 LOWER = nextpos < Low;
+
+        // normal vector
+        double3 normal;
+
+        // point on plane
+        double3 pointOnPlane;
+
+        if (LOWER.x) {
+            fidx = 6*gid + 0;
+            pointOnPlane = make_double3(Low.x, nextpos.y, nextpos.z);
+            normal = make_double3(1.0, 0.0, 0.0);
+        }
+        else if (UPPER.x) {
+            fidx = 6*gid + 1;
+            pointOnPlane = make_double3(High.x, nextpos.y, nextpos.z);
+            normal = make_double3(-1.0, 0.0, 0.0);
+        }
+        else if (LOWER.y) {
+            fidx = 6*gid + 2;
+            pointOnPlane = make_double3(nextpos.x, Low.y, nextpos.z);
+            normal = make_double3(0.0, 1.0, 0.0);
+        }
+        else if (UPPER.y) {
+            fidx = 6*gid + 3;
+            pointOnPlane = make_double3(nextpos.x, High.y, nextpos.z);
+            normal = make_double3(0.0, -1.0, 0.0);
+        }
+        else if (LOWER.z) {
+            fidx = 6*gid + 4;
+            pointOnPlane = make_double3(nextpos.x, nextpos.y, Low.z);
+            normal = make_double3(0.0, 0.0, 1.0);
+        }
+        else if (UPPER.z) {
+            fidx = 6*gid + 5;
+            pointOnPlane = make_double3(nextpos.x, nextpos.y, High.z);
+            normal = make_double3(0.0, 0.0, -1.0);
+        }
+        else {
+            return; // no reflection needed
+        }
+
+        // Calculate D  (Ax + By + Cz + D = 0)
+        double D = -(dot(normal, pointOnPlane));
+
+        double3 intersectionPoint;
+        double3 d = pos - nextpos;
+
+        double t1 = -((dot(normal, nextpos) + D)) / dot(normal, d);
+        intersectionPoint = nextpos + d * t1;
+
+        double3 reflectionVector = nextpos - intersectionPoint;
+        reflectionVector = reflectionVector - normal * (2 * dot(reflectionVector,normal));
+
+        // record the unreflected position
+        double3 unreflected = nextpos;
+        double3 intersection = intersectionPoint;
+        nextpos = intersectionPoint + reflectionVector;
+
+        printf("NextPos: %f %f %f -> %f %f %f\n", nextpos.x, nextpos.y, nextpos.z, intersectionPoint.x+reflectionVector.x, intersectionPoint.y + reflectionVector.y, intersectionPoint.z + reflectionVector.z);
+        printf("Count: %d\n", count);
+        count += 1;
+
+        // store the intersection point and unreflected position
+        set(reflections, did[3], intersectionPoint);
+        set(uref, did[3], unreflected);
+
+        // Update the particle's position
+        nextpos = intersectionPoint + reflectionVector;
+
+        // flip the particle's direction
+        flips[fidx] += 1; // no need for atomicAdd since gid is what is parallelized
+    }
 }

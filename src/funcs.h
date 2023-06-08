@@ -90,3 +90,33 @@ __device__ double3
   * @param nextpos next position
   */
 __device__ void computeNext(double3 &A, double &step, double4 &xi, double3 &nextpos, double &pi);
+
+/**
+ * @brief Checks if the particle is inside the connections listed for voxel
+ * @param i_int3 size of the index array
+ * @param test_lutvalue index of the voxel
+ * @param nextpos position of the particle
+ * @param NewIndex index array
+ * @param d4swc swc array
+ * @return true if particle is inside the connection
+ */
+__device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos, int *NewIndex, double4 *d4swc);
+
+/**
+ * @brief Checks the validity of the next position and updates the position and next position accordingly.
+ * @param nextpos next position
+ * @param pos current position
+ * @param b_int3 bounding box
+ * @param upper upper bound
+ * @param lower lower bound
+ * @param floorpos floor position
+ * @param reflections reflection storage
+ * @param uref reflection storage
+ * @param gid particle id
+ * @param i step id
+ * @param size number of particles
+ * @param iter number of iterations
+ * @param flips reflection counter
+ */
+__device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &upper, int3 &lower, int3 &floorpos,
+                           double * reflections, double * uref, int gid, int i, int size, int iter, int * flips);
