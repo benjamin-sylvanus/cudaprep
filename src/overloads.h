@@ -10,6 +10,7 @@
 #include "controller.h"
 #include "viewer.h"
 #include "funcs.h"
+#include "overloads.h"
 
 #include "vector"
 #include "cuda_runtime.h"
@@ -128,8 +129,6 @@ __device__ double distance2(const double4 &lhs, const double4 &rhs);
 //////////////////////////////////////////
 
 __device__ void set(double *lhs, int3 &index, double3 &values);
-
-__device__ int3 operator=(int3 &lhs, int3 &rhs);
 
 
 

@@ -13,6 +13,7 @@
 #include <curand_kernel.h>
 #include <fstream>
 #include <sys/stat.h>
+#include "overloads.h" 
 
 __device__ bool swc2v(double3 nextpos, double4 child, double4 parent, double dist) {
     bool pos;
@@ -61,16 +62,16 @@ __device__ __host__ int s2i(int3 i, int3 b) {
     return 0 + b.x * (b.y * i.z + i.y) + i.x;
 }
 
-__device__ double3 initPosition(int gid, double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state,
+__device__ double3 initPosition(int gid, double *dx2, int3 &Bounds, curandStatePhilox4_32_10_t *state,
                     double *SimulationParams, double4 *d4swc, int *nlut, int *NewIndex,
-                    int *IndexSize, int size, int iter, int init_in, bool debug, double3 point) {
+                    int3 &IndexSize, int size, int iter, int init_in, bool debug, double3 point) {
 
     double3 nextpos;
     int3 upper;
     int3 lower;
     int3 floorpos;
-    int3 b_int3 = make_int3(Bounds[0], Bounds[1], Bounds[2]);
-    int3 i_int3 = make_int3(IndexSize[0], IndexSize[1], IndexSize[2]);
+    int3 b_int3 = make_int3(Bounds.x, Bounds.y, Bounds.z);
+    int3 i_int3 = make_int3(IndexSize.x, IndexSize.y, IndexSize.z);
     double3 b_d3 = make_double3((double) b_int3.x, (double) b_int3.y, (double) b_int3.z);
     curandStatePhilox4_32_10_t localstate = state[gid];
     double4 xr;

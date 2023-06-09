@@ -48,9 +48,9 @@ __device__ double3
  * @param debug display calculations?
  * @return initial position
  */
-initPosition(int gid, double *dx2, int *Bounds, curandStatePhilox4_32_10_t *state,
+initPosition(int gid, double *dx2, int3 &Bounds, curandStatePhilox4_32_10_t *state,
                     double *SimulationParams, double4 *d4swc, int *nlut, int *NewIndex,
-                    int *IndexSize, int size, int iter,int init_in, bool debug, double3 point);
+                    int3 &IndexSize, int size, int iter,int init_in, bool debug, double3 point);
 
 
 
