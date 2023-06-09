@@ -67,10 +67,6 @@ __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long se
 }
 
 
-
-
-
-
 /**
  * @brief Simulation Kernel for the GPU
  * @param savedata - the data to be saved
@@ -99,18 +95,31 @@ __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long se
  * @param BVal - the BVal data
  * @param TD - the TD data
  */
-__global__ void simulate(double *savedata, double *dx2, double *dx4, int3 *Bounds, curandStatePhilox4_32_10_t *state,
+__global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds, curandStatePhilox4_32_10_t *state,
                          double *SimulationParams,
-                         double4 *d4swc, int *nlut, int *NewIndex, int3 *IndexSize, int size, int iter, bool debug,
+                         double4 *d4swc, int *nlut, int *NewIndex, int3 IndexSize, int size, int iter, bool debug,
                          double3 point, int SaveAll, double * Reflections, double * Uref, int * flip,
                          double * T2, double * T, double * Sig0, double * SigRe, double* BVec, double * BVal, double * TD) {
 
     int gid = threadIdx.x + blockDim.x * blockIdx.x;
     if (gid < size) {
+        /**
+            <li> particle_num = SimulationParams[0] </li>
+            <li> step_num = SimulationParams[1] </li>
+            <li> step_size = SimulationParams[2] </li>
+            <li> perm_prob = SimulationParams[3] </li>
+            <li> init_in = SimulationParams[4] </li>
+            <li> D0 = SimulationParams[5] </li>
+            <li> d = SimulationParams[6] </li>
+            <li> scale = SimulationParams[7] </li>
+            <li> tstep = SimulationParams[8] </li>
+        */
+
+
         double step_size = SimulationParams[2];
         double perm_prob = SimulationParams[3];
         int init_in = (int) SimulationParams[4];
-        // init_in = 3;
+        double tstep = SimulationParams[8];
         double vsize = SimulationParams[9];
         double3 A;
         int2 parstate;
@@ -120,9 +129,11 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 *Bound
         int3 upper;
         int3 lower;
         int3 floorpos;
-        int3 b_int3 = Bounds;
-        int3 i_int3 = IndexSize;
-        _T2 = make_double3(80,80,80);
+        int Tstep=iter/timepoints;
+
+        int3 b_int3 = make_int3(Bounds.x, Bounds.y, Bounds.z);
+        int3 i_int3 = make_int3(IndexSize.x, IndexSize.y, IndexSize.z);
+        double _T2[Nc] ={80};
 
         double3 d2 = make_double3(0.0, 0.0, 0.0);
         bool completes;
@@ -150,15 +161,10 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 *Bound
 
         // parlut defines whether particle is within bounds of LUT
         int parlut = 1;
-        parstate = make_int2(1, 1);
-
-        // parlut defines whether particle is within bounds of LUT
-        int parlut = 1;
+        double t[Nc] ={0}; // add tstep for step in compartment
 
         // iterate over steps
         for (int i = 0; i < iter; i++) {
-
-            if (flag == false) {
                 // generate uniform randoms for step
                 xi = curand_uniform4_double(&localstate);
 
@@ -201,7 +207,7 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 *Bound
                         A = nextpos;
                         parstate.x = parstate.y;
                     } else {
-
+                        
                     }
                 }
 
@@ -211,14 +217,9 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 *Bound
                         A = nextpos;
                         parstate.x = parstate.y;
                     } else {
-
+                        
                     }
                 }
-            } else {
-
-                // update flag for next step
-                flag = false;
-            }
 
             // Store Position Data
             if (SaveAll) {
@@ -234,22 +235,38 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 *Bound
             {
                 diffusionTensor(&A, &xnot, vsize, dx2, dx4, &d2, i, gid, iter, size);
                 // https://github.com/NYU-DiffusionMRI/monte-carlo-simulation-3D-RMS/blob/master/part1_demo3_simulation.m
-                // Signal
 
+            }
+            {
+                if (i%Tstep == 0)
+                {
+                    int tidx=i/Tstep;
                     // loop over compartments
-                    s0 = 0.0;
+                    double s0 = 0.0;
                     for (int j = 0; j < Nc; j++) {
                         /**
-                         * @var s0 is our summation variable
-                         * @var t[j] is the time in compartment j
-                         * @var T2 is the T2 Relaxation in Compartment j
-                         */
-                        s0 = s0 + (t[j]/_T2[j]); // TODO implement "t" as time in each compartment
+                            * @var s0 is our summation variable
+                            * @var t[j] is the time in compartment j
+                            * @var T2 is the T2 Relaxation in Compartment j
+                        */
+                            s0 = s0 + (t[j]/_T2[j]); // TODO implement "t" as time in each compartment
                     }
 
                     s0 = exp(-1.0 * s0);
                     //  tidx=i/Tstep; atomicAdd(&sig0[tidx], s0);
-                    atomicAdd(&sig0[i],s0);
+                    atomicAdd(&Sig0[i],s0);
+                    for (int j = 0; j < Nc; j++)
+                    {
+                        t[j]= 0;
+                    }
+                }
+
+                else 
+                {
+                    t[parstate.x] = t[parstate.x] + tstep;
+                }
+                // Signal
+        
 
                 /*{
                     // loop over b values
@@ -362,6 +379,8 @@ int main(int argc, char *argv[]) {
     std::vector <uint64_t> bounds_dims = arrdims[4];
     int newindexsize = index_dims[0] * index_dims[1] * index_dims[2];
 
+
+
     /**
      * Host Section:
      * - Create Pointers
@@ -369,13 +388,11 @@ int main(int argc, char *argv[]) {
      * - Set Values
      */
     // Create Host Pointers
-    int3 *hostBounds;
     double *hostdx2;
     double *hostdx4;
     double *hostSimP;
     int *hostNewLut;
     int *hostNewIndex;
-    int3 *hostIndexSize;
     double4 *hostD4Swc;
     double *mdx2;
     double *mdx4;
@@ -391,20 +408,20 @@ int main(int argc, char *argv[]) {
     double *hostbval; // Nbvec * 1 (b)
     double *hostTD;   //
 
+
+
     // TD is the time elapsed at timepoint i.
 
 
     // Alloc Memory for Host Pointers
     {
 
-        hostBounds = (int3 *) malloc(SOI3);
         hostdx2 = (double *) malloc(6 * iter * SOD);
         hostdx4 = (double *) malloc(15 * iter * SOD);
         hostSimP = (double *) malloc(10 * SOD);
         hostD4Swc = (double4 *) malloc(nrow * SOD4);
         hostNewLut = (int *) malloc(prod * SOI);
         hostNewIndex = (int *) malloc(newindexsize * SOI);
-        hostIndexSize = (int3 *) malloc(3SOI3);
         mdx2 = (double *) malloc(6 * iter * SOD);
         mdx4 = (double *) malloc(15 * iter * SOD);
         if (SaveAll) {
@@ -416,11 +433,11 @@ int main(int argc, char *argv[]) {
         hosturef = (double *) malloc(3 *iter * size * SOD);
         hostFlip = (int *) malloc(3 * size * SOI);
 
-        // signal variables
+        // Signal Variables
         hostT2 = (double *) malloc(Nc * SOD);
         hostT = (double *) malloc(Nc * SOD);
-        hostSigRe = (double *) malloc(Nbvec * iter * SOD);
-        hostSig0 = (double *) malloc(Nc * iter * SOD);
+        hostSigRe = (double *) malloc(Nbvec * timepoints * SOD);
+        hostSig0 = (double *) malloc(timepoints * SOD);
         hostbvec = (double *) malloc(Nbvec * 3 * SOD);
         hostbval = (double *) malloc(Nbvec * SOD);
         hostTD = (double *) malloc(Nbvec * SOD);
@@ -429,22 +446,6 @@ int main(int argc, char *argv[]) {
 
     // Set Values for Host
     {
-
-        hostBounds = make_int3(boundx,boundy,boundz);
-
-
-        memset(hostdx2, 0.0, 6 * iter * SOD);
-        memset(hostdx4, 0.0, 15 * iter * SOD);
-        {
-
-            for (int i = 0; i < 10; i++) {
-                hostSimP[i] = simparam[i];
-            }
-    {
-
-        hostBounds = make_int3(boundx,boundy,boundz);
-
-
         memset(hostdx2, 0.0, 6 * iter * SOD);
         memset(hostdx4, 0.0, 15 * iter * SOD);
         {
@@ -476,9 +477,6 @@ int main(int argc, char *argv[]) {
                 hostNewIndex[i] = value;
             }
         }
-
-        hostIndexSize = make_int3(index_dims[0],index_dims[1], index_dims[2]);
-
         memset(mdx2, 0.0, 6 * iter * SOD);
         memset(mdx4, 0.0, 15 * iter * SOD);
 
@@ -494,8 +492,8 @@ int main(int argc, char *argv[]) {
         // signal variables
         memset(hostT2, 0.0, Nc * SOD); // T2 is read from file?
         memset(hostT, 0.0, Nc * SOD); // T is set to 0.0
-        memset(hostSigRe, 0.0, Nbvec * iter * SOD); // Calculated in kernel
-        memset(hostSig0, 0.0, Nc * iter * SOD); // Calculated in kernel
+        memset(hostSigRe, 0.0, Nbvec * timepoints * SOD); // Calculated in kernel
+        memset(hostSig0, 0.0, timepoints * SOD); // Calculated in kernel
         memset(hostbvec, 0.0, Nbvec * 3 * SOD); // bvec is read from file
         memset(hostbval, 0.0, Nbvec * SOD); // bval is read from file
         memset(hostTD, 0.0, Nbvec * SOD); // TD is read from file
@@ -512,12 +510,10 @@ int main(int argc, char *argv[]) {
     curandStatePhilox4_32_10_t *deviceState;
     double *devicedx2;
     double *devicedx4;
-    int3 *deviceBounds;
     double *deviceSimP;
     double4 *deviced4Swc;
     int *deviceNewLut;
     int *deviceNewIndex;
-    int3 *deviceIndexSize;
     double *deviceAllData;
     double *deviceReflections;
     double *deviceURef;
@@ -542,13 +538,11 @@ int main(int argc, char *argv[]) {
 
         gpuErrchk(cudaMalloc((double **) &devicedx2, 6 * iter * SOD));
         gpuErrchk(cudaMalloc((double **) &devicedx4, 15 * iter * SOD));
-        gpuErrchk(cudaMalloc((int3 **) &deviceBounds, SOI3));
         gpuErrchk(cudaMalloc((curandStatePhilox4_32_10_t * *) & deviceState, size * sizeof(curandStatePhilox4_32_10_t)));
         gpuErrchk(cudaMalloc((double **) &deviceSimP, 10 * SOD));
         gpuErrchk(cudaMalloc((double4 * *) & deviced4Swc, nrow * SOD4));
         gpuErrchk(cudaMalloc((int **) &deviceNewLut, prod * SOI));
         gpuErrchk(cudaMalloc((int **) &deviceNewIndex, newindexsize * SOI));
-        gpuErrchk(cudaMalloc((int3 **) &deviceIndexSize, SOI3));
         if (SaveAll) {
             gpuErrchk(cudaMalloc((double **) &deviceAllData, 3 * iter * size * SOD));
         } else {
@@ -561,8 +555,8 @@ int main(int argc, char *argv[]) {
         // signal variables
         gpuErrchk(cudaMalloc((double **) &deviceT2, Nc * SOD));
         gpuErrchk(cudaMalloc((double **) &deviceT, Nc * SOD));
-        gpuErrchk(cudaMalloc((double **) &deviceSigRe, Nbvec * iter * SOD));
-        gpuErrchk(cudaMalloc((double **) &deviceSig0, Nc * iter * SOD));
+        gpuErrchk(cudaMalloc((double **) &deviceSigRe, Nbvec * timepoints * SOD));
+        gpuErrchk(cudaMalloc((double **) &deviceSig0, timepoints * SOD));
         gpuErrchk(cudaMalloc((double **) &devicebvec, Nbvec * 3 * SOD));
         gpuErrchk(cudaMalloc((double **) &devicebval, Nbvec * SOD));
         gpuErrchk(cudaMalloc((double **) &deviceTD, Nbvec * SOD));
@@ -574,15 +568,12 @@ int main(int argc, char *argv[]) {
         printf("Copying Host data to Device\n");
         gpuErrchk(cudaMemcpy(devicedx2, hostdx2, 6 * iter * SOD, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(devicedx4, hostdx4, 15 * iter * SOD, cudaMemcpyHostToDevice));
-        gpuErrchk(cudaMemcpy(deviceBounds, hostBounds, SOI3, cudaMemcpyHostToDevice));
-
         setup_kernel<<<grid, block>>>(deviceState, 1);
 
         gpuErrchk(cudaMemcpy(deviceSimP, hostSimP, 10 * SOD, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(deviced4Swc, hostD4Swc, nrow * SOD4, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(deviceNewLut, hostNewLut, prod * SOI, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(deviceNewIndex, hostNewIndex, newindexsize * SOI, cudaMemcpyHostToDevice));
-        gpuErrchk(cudaMemcpy(deviceIndexSize, hostIndexSize, SOI3, cudaMemcpyHostToDevice));
         if (SaveAll) {
             gpuErrchk(cudaMemcpy(deviceAllData, hostAllData, 3 * iter * size * SOD, cudaMemcpyHostToDevice));
         } else {
@@ -595,8 +586,8 @@ int main(int argc, char *argv[]) {
         // signal variables
         gpuErrchk(cudaMemcpy(deviceT2, hostT2, Nc * SOD, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(deviceT, hostT, Nc * SOD, cudaMemcpyHostToDevice));
-        gpuErrchk(cudaMemcpy(deviceSigRe, hostSigRe, Nbvec * iter * SOD, cudaMemcpyHostToDevice));
-        gpuErrchk(cudaMemcpy(deviceSig0, hostSig0, Nc * iter * SOD, cudaMemcpyHostToDevice));
+        gpuErrchk(cudaMemcpy(deviceSigRe, hostSigRe, Nbvec * timepoints * SOD, cudaMemcpyHostToDevice));
+        gpuErrchk(cudaMemcpy(deviceSig0, hostSig0, timepoints * SOD, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(devicebvec, hostbvec, Nbvec * 3 * SOD, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(devicebval, hostbval, Nbvec * SOD, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(deviceTD, hostTD, Nbvec * SOD, cudaMemcpyHostToDevice));
@@ -606,6 +597,9 @@ int main(int argc, char *argv[]) {
     // option for printing in kernel
     bool debug = false;
     double3 point = make_double3(hostD4Swc[0].x, hostD4Swc[0].y, hostD4Swc[0].z);
+    int3 deviceBounds = make_int3(boundx, boundy, boundz);
+    int3 deviceIndexSize = make_int3(index_dims[0], index_dims[1], index_dims[2]);
+
 
 
     /**
@@ -654,8 +648,8 @@ int main(int argc, char *argv[]) {
         // Signal Variables
         gpuErrchk(cudaMemcpy(hostT2, deviceT2, Nc * SOD, cudaMemcpyDeviceToHost));
         gpuErrchk(cudaMemcpy(hostT, deviceT, Nc * SOD, cudaMemcpyDeviceToHost));
-        gpuErrchk(cudaMemcpy(hostSigRe, deviceSigRe, Nbvec * iter * SOD, cudaMemcpyDeviceToHost));
-        gpuErrchk(cudaMemcpy(hostSig0, deviceSig0, Nc * iter * SOD, cudaMemcpyDeviceToHost));
+        gpuErrchk(cudaMemcpy(hostSigRe, deviceSigRe, Nbvec * timepoints * SOD, cudaMemcpyDeviceToHost));
+        gpuErrchk(cudaMemcpy(hostSig0, deviceSig0, timepoints * SOD, cudaMemcpyDeviceToHost));
     }
 
     cudaEventSynchronize(stop_c);
@@ -669,7 +663,6 @@ int main(int argc, char *argv[]) {
     {
 
         printf("Freeing Device Data: ");
-        gpuErrchk(cudaFree(deviceBounds));
         gpuErrchk(cudaFree(deviceState));
         gpuErrchk(cudaFree(devicedx2));
         gpuErrchk(cudaFree(devicedx4));
@@ -677,12 +670,13 @@ int main(int argc, char *argv[]) {
         gpuErrchk(cudaFree(deviced4Swc));
         gpuErrchk(cudaFree(deviceNewLut));
         gpuErrchk(cudaFree(deviceNewIndex));
-        gpuErrchk(cudaFree(deviceIndexSize));
         gpuErrchk(cudaFree(deviceAllData));
+
         // Reflection Variables
         gpuErrchk(cudaFree(deviceReflections));
         gpuErrchk(cudaFree(deviceURef));
         gpuErrchk(cudaFree(deviceFlip));
+
         // Signal Variables
         gpuErrchk(cudaFree(deviceT2));
         gpuErrchk(cudaFree(deviceT));
@@ -779,13 +773,13 @@ int main(int argc, char *argv[]) {
     // Free Host Memory
     {
 
-        free(hostBounds);
+
+
         free(hostdx2);
         free(hostdx4);
         free(hostSimP);
         free(hostD4Swc);
         free(hostNewIndex);
-        free(hostIndexSize);
         free(mdx2);
         free(mdx4);
         free(hostAllData);

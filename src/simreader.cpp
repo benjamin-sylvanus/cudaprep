@@ -28,7 +28,7 @@ std::string simreader::getpath()
 std::vector<std::vector<std::uint64_t>> simreader::readdims(std::string str)
 {
 //    std::string path =  this->getpath().append("/dims.txt");
-    std::string path =  this->getpath().append(p);
+    std::string path =  this->getpath().append(str);
     std::cout<<"Path: "<<path<<std::endl;
 
     std::fstream newfile;
