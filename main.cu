@@ -103,18 +103,16 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
     int gid = threadIdx.x + blockDim.x * blockIdx.x;
     if (gid < size) {
         /**
-            <li> particle_num = SimulationParams[0] </li>
-            <li> step_num = SimulationParams[1] </li>
-            <li> step_size = SimulationParams[2] </li>
-            <li> perm_prob = SimulationParams[3] </li>
-            <li> init_in = SimulationParams[4] </li>
-            <li> D0 = SimulationParams[5] </li>
-            <li> d = SimulationParams[6] </li>
-            <li> scale = SimulationParams[7] </li>
-            <li> tstep = SimulationParams[8] </li>
+            @index particle_num = SimulationParams[0]
+            @index step_num = SimulationParams[1]
+            @index step_size = SimulationParams[2]
+            @index perm_prob = SimulationParams[3]
+            @index init_in = SimulationParams[4]
+            @index D0 = SimulationParams[5]
+            @index d = SimulationParams[6]
+            @index scale = SimulationParams[7]
+            @index tstep = SimulationParams[8]
         */
-
-
         double step_size = SimulationParams[2];
         double perm_prob = SimulationParams[3];
         int init_in = (int) SimulationParams[4];
@@ -232,7 +230,10 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
                 // https://github.com/NYU-DiffusionMRI/monte-carlo-simulation-3D-RMS/blob/master/part1_demo3_simulation.m
 
             }
+
+            // Store Signal Data
             {
+
                 if (i%Tstep == 0)
                 {
                     int tidx=i/Tstep;
@@ -255,7 +256,6 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
                         t[j]= 0;
                     }
                 }
-
                 else 
                 {
                     t[parstate.x] = t[parstate.x] + tstep;
@@ -330,14 +330,13 @@ int main(int argc, char *argv[]) {
         double value = simulationparams[i];
         simparam[i] = value;
     }
+
     int block_size = 256;
     dim3 block(block_size);
     dim3 grid((size / block.x) + 1);
 
     std::vector <uint64_t> bounds = sim.getbounds();
-    int boundx = (int) bounds[0];
-    int boundy = (int) bounds[1];
-    int boundz = (int) bounds[2];
+    int boundx = (int) bounds[0]; int boundy = (int) bounds[1]; int boundz = (int) bounds[2];
     int prod = (int) (boundx * boundy * boundz);
     std::vector<double> r_swc = sim.getSwc();
     int nrow = r_swc.size() / 6;
@@ -367,14 +366,8 @@ int main(int argc, char *argv[]) {
     std::vector <uint64_t> bounds_dims = arrdims[4];
     int newindexsize = index_dims[0] * index_dims[1] * index_dims[2];
 
+    ///Host Section
 
-
-    /**
-     * Host Section:
-     * - Create Pointers
-     * - Allocate Memory
-     * - Set Values
-     */
     // Create Host Pointers
     double *hostdx2;
     double *hostdx4;
@@ -394,12 +387,7 @@ int main(int argc, char *argv[]) {
     double *hostSig0; // Nc * iter
     double *hostbvec; // Nbvec * 3 (x,y,z)
     double *hostbval; // Nbvec * 1 (b)
-    double *hostTD;   //
-
-
-
-    // TD is the time elapsed at timepoint i.
-
+    double *hostTD;   // TD is the time elapsed at timepoint i.
 
     // Alloc Memory for Host Pointers
     {
@@ -549,8 +537,7 @@ int main(int argc, char *argv[]) {
         printf("Copying Host data to Device\n");
         gpuErrchk(cudaMemcpy(devicedx2, hostdx2, 6 * iter * SOD, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(devicedx4, hostdx4, 15 * iter * SOD, cudaMemcpyHostToDevice));
-        setup_kernel<<<grid, block>>>(deviceState, 1);
-
+        setup_kernel<<<grid, block>>>(deviceState, 1); // initialize the random states
         gpuErrchk(cudaMemcpy(deviceSimP, hostSimP, 10 * SOD, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(deviced4Swc, hostD4Swc, nrow * SOD4, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(deviceNewLut, hostNewLut, prod * SOI, cudaMemcpyHostToDevice));
@@ -586,11 +573,11 @@ int main(int argc, char *argv[]) {
     /**
      * Call Kernel
     */
-    printf("Simulating...\n");
+
 
     // kernel
     {
-
+        printf("Simulating...\n");
         simulate<<<grid, block>>>(deviceAllData, devicedx2, devicedx4, deviceBounds, deviceState, deviceSimP,
                                   deviced4Swc, deviceNewLut, deviceNewIndex, deviceIndexSize, size, iter, debug, point,
                                   SaveAll,
