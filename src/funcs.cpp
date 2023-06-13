@@ -330,7 +330,7 @@ __device__ void computeNext(double3 &A, double &step, double4 &xi, double3 &next
     nextpos.z = A.z + (step * cos_phi);
 }
 
-__device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos, int *NewIndex, double4 *d4swc) {
+__device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos, int *NewIndex, double4 *d4swc, double &fstep) {
     int3 vindex;
     double4 child, parent;
     double dist2;

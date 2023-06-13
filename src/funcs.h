@@ -100,7 +100,7 @@ __device__ void computeNext(double3 &A, double &step, double4 &xi, double3 &next
  * @param d4swc swc array
  * @return true if particle is inside the connection
  */
-__device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos, int *NewIndex, double4 *d4swc);
+__device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos, int *NewIndex, double4 *d4swc, double &fstep);
 
 /**
  * @brief Checks the validity of the next position and updates the position and next position accordingly.
