@@ -127,10 +127,17 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
         int3 lower;
         int3 floorpos;
         int Tstep=iter/timepoints;
+        double fstep = 1;
 
         int3 b_int3 = make_int3(Bounds.x, Bounds.y, Bounds.z);
         int3 i_int3 = make_int3(IndexSize.x, IndexSize.y, IndexSize.z);
-        double _T2[Nc] ={80};
+    
+        double _T2[Nc]; 
+        double t2[3] = {80, 40, 60};
+        for (int j = 0; j < Nc; j++)
+        {
+            _T2[j] = t2[j];
+        }
 
         double3 d2 = make_double3(0.0, 0.0, 0.0);
         bool completes;
@@ -180,7 +187,7 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
                 int test_lutvalue = nlut[s2i(floorpos,b_int3)];
 
                 // for each connection check if particle inside
-                bool inside = checkConnections(i_int3, test_lutvalue, nextpos, NewIndex, d4swc);
+                bool inside = checkConnections(i_int3, test_lutvalue, nextpos, NewIndex, d4swc, fstep);
 
                 parstate.y = (inside) ? 1 : 0;
 
@@ -192,15 +199,24 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
                 */
 
                 // particle inside: [0 0] || [1 1]
-                if (parstate.x == parstate.y) { A = nextpos; }
+                if (parstate.x == parstate.y) { 
+                    A = nextpos; 
+                    if (parstate.x) {
+                        t[0] = t[0] + tstep;
+                    } else {
+                        t[1] = t[1] + tstep;
+                    }
+                }
 
                 // particle inside: [1 0]
                 if (parstate.x && !parstate.y) {
                     if (completes == true) {
                         A = nextpos;
                         parstate.x = parstate.y;
+                        t[0] = t[0] + tstep * fstep;
+                        t[1] = t[1] + tstep * (1 - fstep);
                     } else {
-                        
+                        t[0] = t[0] + tstep;
                     }
                 }
 
@@ -209,8 +225,10 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
                     if (completes == true) {
                         A = nextpos;
                         parstate.x = parstate.y;
+                        t[0] = t[0] + tstep * 1-fstep;
+                        t[1] = t[1] + tstep * fstep;
                     } else {
-                        
+                        t[1] = t[1] + tstep;
                     }
                 }
 
@@ -239,26 +257,23 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
                     int tidx=i/Tstep;
                     // loop over compartments
                     double s0 = 0.0;
-                    for (int j = 0; j < Nc; j++) {
+                    for (int j = 0; j < 2; j++) {
                         /**
                             * @var s0 is our summation variable
                             * @var t[j] is the time in compartment j
                             * @var T2 is the T2 Relaxation in Compartment j
-                        */
-                            s0 = s0 + (t[j]/_T2[j]); // TODO implement "t" as time in each compartment
+                        */  
+                            s0 = s0 + (double) (t[j] / _T2[j]); // TODO implement "t" as time in each compartment
+
                     }
 
+
                     s0 = exp(-1.0 * s0);
-                    //  tidx=i/Tstep; atomicAdd(&sig0[tidx], s0);
-                    atomicAdd(&Sig0[i],s0);
+                    atomicAdd(&Sig0[tidx],s0);
                     for (int j = 0; j < Nc; j++)
                     {
                         t[j]= 0;
                     }
-                }
-                else 
-                {
-                    t[parstate.x] = t[parstate.x] + tstep;
                 }
                 // Signal
         
@@ -582,7 +597,7 @@ int main(int argc, char *argv[]) {
                                   deviced4Swc, deviceNewLut, deviceNewIndex, deviceIndexSize, size, iter, debug, point,
                                   SaveAll,
                                   deviceReflections, deviceURef, deviceFlip, // reflection variables
-                                  deviceT2, deviceT, deviceSigRe, deviceSig0, devicebvec, devicebval, deviceTD); // signal variables
+                                  deviceT2, deviceT, deviceSig0, deviceSigRe, devicebvec, devicebval, deviceTD); // signal variables
         cudaEventRecord(stop_c);
     }
 
@@ -689,7 +704,7 @@ int main(int argc, char *argv[]) {
         std::string sig0Path = outpath;
         sig0Path.append("/sig0.bin");
         outFile = fopen(sig0Path.c_str(), "wb");
-        fwrite(hostSig0, SOD, Nc * iter, outFile);
+        fwrite(hostSig0, SOD, timepoints, outFile);
         fclose(outFile);
         std::string sigRePath = outpath;
         sigRePath.append("/sigRe.bin");
