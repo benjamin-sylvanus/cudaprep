@@ -16,13 +16,19 @@
 
 
 simulation::simulation(simreader reader, std::string outpath) {
+
+    // Read the dimensions of each element
+    this->arraydims = reader.readdims("/dims.txt");
+
+    // Allocate Data on each
+
     this->swc = reader.read<double>("/swc.bin");
     this->parameterdata = reader.read<double>("/constants.bin");
     this->index = reader.read<std::uint64_t>("/index.bin");
     this->lut = reader.read<uint64_t>("/lut.bin");
     this->pairs = reader.read<uint64_t>("/pairs.bin");
     this->bounds = reader.read<uint64_t>("/bounds.bin");
-    this->arraydims = reader.readdims("/dims.txt");
+
     this->particle_num = this->parameterdata[0];
     this->step_num = this->parameterdata[1];
     this->step_size = this->parameterdata[2];
