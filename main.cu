@@ -251,7 +251,6 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
 
             // Store Signal Data
             {
-
                 if (i%Tstep == 0)
                 {
                     int tidx=i/Tstep;
@@ -276,9 +275,17 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
                     }
                 }
                 // Signal
+
+                /*
+                Questions:
+                - Can I use the btable from 
+
+                
+                */
         
 
                 /*{
+
                     // loop over b values
                     for (int j = 0; j < Nbvec; j++) {
                         // bval is the b value
