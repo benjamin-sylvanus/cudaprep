@@ -251,7 +251,7 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
 
             // Store Signal Data
             {
-
+                // * t for unitless
                 if (i%Tstep == 0)
                 {
                     int tidx=i/Tstep;
@@ -263,10 +263,8 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
                             * @var t[j] is the time in compartment j
                             * @var T2 is the T2 Relaxation in Compartment j
                         */  
-                            s0 = s0 + (double) (t[j] / _T2[j]); // TODO implement "t" as time in each compartment
-
+                            s0 = s0 + (t[j] / _T2[j]); // TODO implement "t" as time in each compartment
                     }
-
 
                     s0 = exp(-1.0 * s0);
                     atomicAdd(&Sig0[tidx],s0);
@@ -513,7 +511,6 @@ int main(int argc, char *argv[]) {
     double *devicebval;
     double *deviceTD;
 
-
     clock_t start = clock();
     cudaEventRecord(start_c);
 
@@ -583,12 +580,9 @@ int main(int argc, char *argv[]) {
     int3 deviceBounds = make_int3(boundx, boundy, boundz);
     int3 deviceIndexSize = make_int3(index_dims[0], index_dims[1], index_dims[2]);
 
-
-
     /**
      * Call Kernel
     */
-
 
     // kernel
     {
@@ -747,3 +741,12 @@ int main(int argc, char *argv[]) {
     printf("Done!\n");
     return 0;
 }
+
+/*
+
+
+ writeResults(w_swc, hostSimP, hostdx2, mdx2, hostdx4, mdx4,t, hostReflections,  hosturef,  hostSig0,
+                                    hostSigRe, hostAllData, iter, size, nrow, timepoints, Nbvec, sa_size, SaveAll,
+                                    outpath);
+
+ */
