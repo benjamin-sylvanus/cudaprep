@@ -274,9 +274,7 @@ int main(int argc, char *argv[]) {
     cudaEventCreate(&stop_c);
     float milliseconds = 0;
     system("clear");
-    int size = 10;
-    int iter = 10;
-    int SaveAll;
+    int size, iter, SaveAll;
     std::string path;
     controller control;
 
@@ -295,9 +293,7 @@ int main(int argc, char *argv[]) {
     } else {
         control.Setup(argc, argv, 1);
     }
-
     system("clear");
-
     double simparam[10];
     simulation sim = control.getSim();
     printf("Path: %s\n", sim.getResultPath().c_str());
@@ -306,6 +302,8 @@ int main(int argc, char *argv[]) {
     iter = sim.getStep_num();
     std::vector<double> simulationparams = sim.getParameterdata();
     SaveAll = sim.getSaveAll();
+    // ternary operator to get the size for saving all
+    int sa_size = (SaveAll) ? size * iter : 1;
 
     for (int i = 0; i < 10; i++) {
         double value = simulationparams[i];
@@ -351,223 +349,135 @@ int main(int argc, char *argv[]) {
 
     // Declare Unified Memory Pointers
 
-    double *unified_dx2, *unified_dx4, *unified_SimP, *unified_T2, *unified_T, *unified_SigRe, *unified_Sig0, *unified_bvec,
-            *unified_bval, *unified_TD, *mdx2, *mdx4, *unified_AllData, *unified_Reflections, *unified_uref;
+    double *u_dx2, *u_dx4, *u_SimP, *u_T2, *u_T, *u_SigRe, *u_Sig0, *u_bvec,
+            *u_bval, *u_TD, *mdx2, *mdx4, *u_AllData, *u_Reflections, *u_uref;
 
+    int *u_NewLut, *u_NewIndex, *u_Flip;
+    double4 *u_D4Swc;
 
-    int *unified_NewLut, *unified_NewIndex, *unified_Flip;
-    double4 *unified_D4Swc;
-
-    cudaMallocManaged(unified_dx2, 6 * iter * SOD);
-    cudaMallocManaged(unified_dx4, 15 * iter * SOD);
-    cudaMallocManaged(unified_SimP, 10 * SOD);
-    cudaMallocManaged(unified_D4Swc, nrow * SOD4);
-    cudaMallocManaged(unified_NewLut, prod * SOI);
-    cudaMallocManaged(unified_NewIndex, newindexsize * SOI);
-    cudaMallocManaged(mdx2, 6 * iter * SOD);
-    cudaMallocManaged(mdx4, 15 * iter * SOD);
-    if (SaveAll) {
-        cudaMallocManaged(unified_AllData, 3 * iter * size * SOD);
-    } else {
-        cudaMallocManaged(unified_AllData, 3 * SOD);
-    }
-    cudaMallocManaged(unified_Reflections, 3 *iter * size * SOD);
-    cudaMallocManaged(unified_uref, 3 *iter * size * SOD);
-    cudaMallocManaged(unified_Flip, 3 * size * SOI);
-
-    cudaMallocManaged()// Signal Variables
-    cudaMallocManaged(unified_T2, Nc * SOD);
-    cudaMallocManaged(unified_T, Nc * SOD);
-    cudaMallocManaged(unified_SigRe, Nbvec * timepoints * SOD);
-    cudaMallocManaged(unified_Sig0, timepoints * SOD);
-    cudaMallocManaged(unified_bvec, Nbvec * 3 * SOD);
-    cudaMallocManaged(unified_bval, Nbvec * SOD);
-    cudaMallocManaged(unified_TD, Nbvec * SOD);
+    cudaMallocManaged(&u_dx2, 6 * iter * SOD);
+    cudaMallocManaged(&u_dx4, 15 * iter * SOD);
+    cudaMallocManaged(&u_SimP, 10 * SOD);
+    cudaMallocManaged(&mdx2, 6 * iter * SOD);
+    cudaMallocManaged(&mdx4, 15 * iter * SOD);
+    cudaMallocManaged(&u_AllData, 3 * sa_size * SOD);
+    cudaMallocManaged(&u_Reflections, 3 * iter * size * SOD);
+    cudaMallocManaged(&u_uref, 3 * iter * size * SOD);
+    cudaMallocManaged(&u_T2, Nc * SOD);
+    cudaMallocManaged(&u_T, Nc * SOD);
+    cudaMallocManaged(&u_SigRe, Nbvec * timepoints * SOD);
+    cudaMallocManaged(&u_Sig0, timepoints * SOD);
+    cudaMallocManaged(&u_bvec, Nbvec * 3 * SOD);
+    cudaMallocManaged(&u_bval, Nbvec * SOD);
+    cudaMallocManaged(&u_TD, Nbvec * SOD);
+    cudaMallocManaged(&u_NewLut, prod * SOI);
+    cudaMallocManaged(&u_NewIndex, newindexsize * SOI);
+    cudaMallocManaged(&u_Flip, 3 * size * SOI);
+    cudaMallocManaged(&u_D4Swc, nrow * SOD4);
     printf("Allocated Host Data\n");
 
-    // Set Values for Host
-    {
-        memset(unified_dx2, 0.0, 6 * iter * SOD);
-        memset(unified_dx4, 0.0, 15 * iter * SOD);
-        {
+    // Call Function to Set the Values for Host
+    setup_data(u_dx2, u_dx4, u_SimP, u_D4Swc, u_NewLut, u_NewIndex,  u_Flip,  simparam,  swc_trim, lut,
+    indexarr, bounds, nrow, prod, newindexsize, sa_size, Nbvec, timepoints, NC);
 
-            for (int i = 0; i < 10; i++) {
-                unified_SimP[i] = simparam[i];
-            }
-
-            for (int i = 0; i < nrow; i++) {
-                unified_D4Swc[i].x = swc_trim[i].x;
-                unified_D4Swc[i].y = swc_trim[i].y;
-                unified_D4Swc[i].z = swc_trim[i].z;
-                unified_D4Swc[i].w = swc_trim[i].w;
-            }
-
-            for (int i = 0; i < prod; i++) {
-                int value = lut[i];
-                unified_NewLut[i] = value;
-            }
-
-            for (int i = 0; i < indexarr.size(); i++) {
-                int value = indexarr[i];
-                unified_NewIndex[i] = value;
-            }
-        }
-        memset(mdx2, 0.0, 6 * iter * SOD);
-        memset(mdx4, 0.0, 15 * iter * SOD);
-
-        if (SaveAll) {
-            memset(unified_AllData, 0.0, 3 * iter * size * SOD);
-        } else {
-            memset(unified_AllData, 0.0, 3 * SOD);
-        }
-        memset(unified_Reflections, 0.0, 3 * iter * size * SOD);
-        memset(unified_uref, 0.0, 3 * iter * size * SOD);
-        memset(unified_Flip, 0.0, 3 * size * SOI);
-
-        // signal variables
-        memset(unified_T2, 0.0, Nc * SOD); // T2 is read from file?
-        memset(unified_T, 0.0, Nc * SOD); // T is set to 0.0
-        memset(unified_SigRe, 0.0, Nbvec * timepoints * SOD); // Calculated in kernel
-        memset(unified_Sig0, 0.0, timepoints * SOD); // Calculated in kernel
-        memset(unified_bvec, 0.0, Nbvec * 3 * SOD); // bvec is read from file
-        memset(unified_bval, 0.0, Nbvec * SOD); // bval is read from file
-        memset(unified_TD, 0.0, Nbvec * SOD); // TD is read from file
-        printf("Set Host Values\n");
-    }
-
-    /**
-     * Device Section:
-     * - Create Pointers
-     * - Allocate Memory
-     * - Set Values
-     */
-    // Create Device Pointers
+    // Create Random State Pointer Pointers
     curandStatePhilox4_32_10_t *deviceState;
 
-    clock_t start = clock();
     cudaEventRecord(start_c);
     // Allocate Memory on Device
-    {
-        gpuErrchk(cudaMalloc((curandStatePhilox4_32_10_t * *) & deviceState, size * sizeof(curandStatePhilox4_32_10_t)));
-    }
+    gpuErrchk(cudaMalloc((curandStatePhilox4_32_10_t * *) & deviceState, size * sizeof(curandStatePhilox4_32_10_t)));
 
     // Set Values for Device
-    {
-        setup_kernel<<<grid, block>>>(deviceState, 1); // initialize the random states
-    }
+    setup_kernel<<<grid, block>>>(deviceState, 1); // initialize the random states
 
     // option for printing in kernel
     bool debug = false;
     double3 point = make_double3(hostD4Swc[0].x, hostD4Swc[0].y, hostD4Swc[0].z);
-    int3 unified_Bounds = make_int3(boundx, boundy, boundz);
-    int3 unified_IndexSize = make_int3(index_dims[0], index_dims[1], index_dims[2]);
+    int3 u_Bounds = make_int3(boundx, boundy, boundz);
+    int3 u_IndexSize = make_int3(index_dims[0], index_dims[1], index_dims[2]);
+
+    // Prefetch data asynchronously
+    cudaMemPrefetchAsync(&u_dx2, 6 * iter * SOD, cudaCpuDeviceId);
+    cudaMemPrefetchAsync(&u_dx4, 15 * iter * SOD, cudaCpuDeviceId);
+    cudaMemPrefetchAsync(&u_SimP, 10 * SOD, cudaCpuDeviceId);
+    cudaMemPrefetchAsync(&mdx2, 6 * iter * SOD, cudaCpuDeviceId);
+    cudaMemPrefetchAsync(&mdx4, 15 * iter * SOD, cudaCpuDeviceId);
+    cudaMemPrefetchAsync(&u_AllData, 3 * sa_size * SOD, cudaCpuDeviceId);
+    cudaMemPrefetchAsync(&u_Reflections, 3 * iter * size * SOD, cudaCpuDeviceId);
+    cudaMemPrefetchAsync(&u_uref, 3 * iter * size * SOD, cudaCpuDeviceId);
+    cudaMemPrefetchAsync(&u_T2, Nc * SOD, cudaCpuDeviceId);
+    cudaMemPrefetchAsync(&u_T, Nc * SOD, cudaCpuDeviceId);
+    cudaMemPrefetchAsync(&u_SigRe, Nbvec * timepoints * SOD, cudaCpuDeviceId);
+    cudaMemPrefetchAsync(&u_Sig0, timepoints * SOD, cudaCpuDeviceId);
+    cudaMemPrefetchAsync(&u_bvec, Nbvec * 3 * SOD, cudaCpuDeviceId);
+    cudaMemPrefetchAsync(&u_bval, Nbvec * SOD, cudaCpuDeviceId);
+    cudaMemPrefetchAsync(&u_TD, Nbvec * SOD, cudaCpuDeviceId);
+    cudaMemPrefetchAsync(&u_NewLut, prod * SOI, cudaCpuDeviceId);
+    cudaMemPrefetchAsync(&u_NewIndex, newindexsize * SOI, cudaCpuDeviceId);
+    cudaMemPrefetchAsync(&u_Flip, 3 * size * SOI, cudaCpuDeviceId);
+    cudaMemPrefetchAsync(&u_D4Swc, nrow * SOD4, cudaCpuDeviceId);
+
     /**
      * Call Kernel
     */
-
-
-    // kernel
     {
         printf("Simulating...\n");
-        simulate<<<grid, block>>>(unified_AllData, unified_dx2, unified_dx4, unified_Bounds, deviceState, unified_SimP,
-                                  unified_d4Swc, unified_NewLut, unified_NewIndex, unified_IndexSize, size, iter, debug, point,
-                                  SaveAll,
-                                  unified_Reflections, unified_URef, unified_Flip, // reflection variables
-                                  unified_T2, unified_T, unified_Sig0, unified_SigRe, unified_bvec, unified_bval, unified_TD); // signal variables
+        simulate<<<grid, block>>>(u_AllData, u_dx2, u_dx4, u_Bounds, deviceState, u_SimP,
+                                  u_d4Swc, u_NewLut, u_NewIndex, u_IndexSize, size,
+                                  iter, debug, point,SaveAll, u_Reflections, u_URef, u_Flip,
+                                  u_T2, u_T, u_Sig0, u_SigRe, u_bvec, u_bval, u_TD);
         cudaEventRecord(stop_c);
     }
 
     // Wait for results
     cudaDeviceSynchronize();
 
-    clock_t end = clock();
-    double gpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("Simulation took %f seconds\n", gpu_time_used);
-
     /**
      * Copy Results From Device to Host
      */
     printf("Copying back to Host\n");
-
     cudaEventSynchronize(stop_c);
     cudaEventElapsedTime(&milliseconds, start_c, stop_c);
     end = clock();
     printf("Kernel took %f seconds\n", milliseconds / 1e3);
-    auto t1 = high_resolution_clock::now();
-
-
-
-    auto t2 = high_resolution_clock::now();
-    duration<double, std::milli> ms_double = t2 - t1;
-    printf("%f seconds\n", ms_double.count() / 1e3);
     printf("Writing results: ");
-
     // Write Results
     {
-
         std::string outpath = sim.getResultPath();
         t1 = high_resolution_clock::now();
-        writeResults(unified_dx2, unified_dx4, mdx2, mdx4, unified_SimP, w_swc, iter, size, nrow, outpath);
-        std::string allDataPath = outpath;
-        if (SaveAll) {
-            allDataPath.append("/allData.bin");
-            FILE *outFile = fopen(allDataPath.c_str(), "wb");
-            fwrite(unified_AllData, SOD, iter * size * 3, outFile);
-            fclose(outFile);
-        }
-        // write reflections and uref
-        std::string reflectionsPath = outpath;
-        reflectionsPath.append("/reflections.bin");
-        FILE *outFile = fopen(reflectionsPath.c_str(), "wb");
-        fwrite(unified_Reflections, SOD, iter * size * 3, outFile);
-        fclose(outFile);
-        std::string urefPath = outpath;
-        urefPath.append("/uref.bin");
-        outFile = fopen(urefPath.c_str(), "wb");
-        fwrite(unified_uref, SOD, iter * size * 3, outFile);
-        fclose(outFile);
+        // writeResults(u_dx2, u_dx4, mdx2, mdx4, u_SimP, w_swc, iter, size, nrow, outpath);
+        writeResults(w_swc, hostSimP, hostdx2, mdx2, hostdx4,
+                 mdx4, t, u_Reflections, u_uref, u_Sig0,
+                 u_SigRe, u_AllData,iter, size, nrow, sa_size, outpath);
 
-        // write sig0 and sigRe
-        std::string sig0Path = outpath;
-        sig0Path.append("/sig0.bin");
-        outFile = fopen(sig0Path.c_str(), "wb");
-        fwrite(unified_Sig0, SOD, timepoints, outFile);
-        fclose(outFile);
-        std::string sigRePath = outpath;
-        sigRePath.append("/sigRe.bin");
-        outFile = fopen(sigRePath.c_str(), "wb");
-        fwrite(unified_SigRe, SOD, Nbvec * iter, outFile);
-        fclose(outFile);
     }
 
     t2 = high_resolution_clock::now();
     ms_double = t2 - t1;
     printf("%f seconds\n", ms_double.count() / 1e3);
 
-    // Free Device Memory
+    // Free Memory
     {
-        printf("Freeing Device Data: ");
-        gpuErrchk(cudaFree(unified_dx2));
-        gpuErrchk(cudaFree(unified_dx4));
-        gpuErrchk(cudaFree(unified_SimP));
-        gpuErrchk(cudaFree(unified_d4Swc));
-        gpuErrchk(cudaFree(unified_NewLut));
-        gpuErrchk(cudaFree(unified_NewIndex));
-        gpuErrchk(cudaFree(unified_AllData));
-
+        printf("Freeing Memory: ");
+        gpuErrchk(cudaFree(u_dx2));
+        gpuErrchk(cudaFree(u_dx4));
+        gpuErrchk(cudaFree(u_SimP));
+        gpuErrchk(cudaFree(u_d4Swc));
+        gpuErrchk(cudaFree(u_NewLut));
+        gpuErrchk(cudaFree(u_NewIndex));
+        gpuErrchk(cudaFree(u_AllData));
         // Reflection Variables
-        gpuErrchk(cudaFree(unified_Reflections));
-        gpuErrchk(cudaFree(unified_URef));
-        gpuErrchk(cudaFree(unified_Flip));
-
+        gpuErrchk(cudaFree(u_Reflections));
+        gpuErrchk(cudaFree(u_URef));
+        gpuErrchk(cudaFree(u_Flip));
         // Signal Variables
-        gpuErrchk(cudaFree(unified_T2));
-        gpuErrchk(cudaFree(unified_T));
-        gpuErrchk(cudaFree(unified_SigRe));
-        gpuErrchk(cudaFree(unified_Sig0));
-        gpuErrchk(cudaFree(unified_bvec));
-        gpuErrchk(cudaFree(unified_bval));
-        gpuErrchk(cudaFree(unified_TD));
+        gpuErrchk(cudaFree(u_T2));
+        gpuErrchk(cudaFree(u_T));
+        gpuErrchk(cudaFree(u_SigRe));
+        gpuErrchk(cudaFree(u_Sig0));
+        gpuErrchk(cudaFree(u_bvec));
+        gpuErrchk(cudaFree(u_bval));
+        gpuErrchk(cudaFree(u_TD));
         gpuErrchk(cudaFree(deviceState));
     }
 

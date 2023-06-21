@@ -776,7 +776,6 @@ int main(int argc, char *argv[]) {
     {
 
 
-
         free(hostdx2);
         free(hostdx4);
         free(hostSimP);

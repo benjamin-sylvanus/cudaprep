@@ -78,9 +78,32 @@ __device__ double3
  setNextPos(double3 nextpos,double3 A,double4 xi, double step);
 
 
+ /**
+  * @brief Writes Results
+  * @param w_swc
+  * @param hostSimP
+  * @param hostdx2
+  * @param mdx2
+  * @param hostdx4
+  * @param mdx4
+  * @param t
+  * @param u_Reflections
+  * @param u_uref
+  * @param u_Sig0
+  * @param u_SigRe
+  * @param u_AllData
+  * @param iter
+  * @param size
+  * @param nrow
+  * @param sa_size
+  * @param outpath
+  * @return
+  */
  __host__ void
- writeResults(double * hostdx2, double * hostdx4, double * mdx2, double * mdx4, double * hostSimP, double * w_swc, int iter, int size, int nrow, std::string outpath);
-
+ writeResults(double * w_swc, double * hostSimP, double * hostdx2, double * mdx2, double * hostdx4,
+                                    double * mdx4, double * t, double * u_Reflections, double * u_uref, double * u_Sig0,
+                                    double * u_SigRe, double * u_AllData,int iter, int size, int nrow, int sa_size,
+                                    std::string outpath)
 
  /**
   * @brief Compute the next position of the particle
@@ -120,3 +143,30 @@ __device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos
  */
 __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &upper, int3 &lower, int3 &floorpos,
                            double * reflections, double * uref, int gid, int i, int size, int iter, int * flips);
+
+
+/**
+ * @param u_dx2 diffusion tensor
+ * @param u_dx4 diffusion tensor
+ * @param u_SimP simulation parameters
+ * @param u_D4Swc swc data
+ * @param u_NewLut lookuptable
+ * @param u_NewIndex index array
+ * @param u_Flip reflection counter
+ * @param simparam simulation parameters
+ * @param swc_trim swc data
+ * @param lut lookuptable
+ * @param indexarr index array
+ * @param bounds bounding box
+ * @param nrow number of rows
+ * @param prod product of dimensions
+ * @param newindexsize size of index array
+ * @param sa_size size of the saveall array
+ * @param Nbvec number of vectors
+ * @param timepoints number of timepoints
+ * @param NC number of connections
+ * @brief Sets up the data for the simulation
+ */
+__device__ __host__ void setup_data(double * u_dx2, double * u_dx4, double * u_SimP, double3 * u_D4Swc, int * u_NewLut,
+                                    int * u_NewIndex, int * u_Flip, double * simparam, double3 * swc_trim, int * lut,
+                                    int * indexarr, int * bounds, int nrow, int prod, int newindexsize, int sa_size, int Nbvec, int timepoints, int NC);
