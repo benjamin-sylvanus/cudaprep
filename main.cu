@@ -402,7 +402,7 @@ int main(int argc, char *argv[]) {
     double *hostAllData;
     double *hostReflections;
     double *hosturef;
-    int* hostFlip;
+    int *hostFlip;
     double *hostT2; // Nc * 1
     double *hostT; // Nc * 1
     double *hostSigRe; // Nbvec * iter
