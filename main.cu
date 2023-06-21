@@ -720,7 +720,6 @@ int main(int argc, char *argv[]) {
     // Free Host Memory
     {
 
-
         free(hostdx2);
         free(hostdx4);
         free(hostSimP);

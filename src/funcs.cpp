@@ -80,8 +80,6 @@ __device__ double3 initPosition(int gid, double *dx2, int3 &Bounds, curandStateP
     parstate.y = 0;
     bool cont = true;
 
-
-    // todo implement different particle initial states;
     /**
     * Case 1: particles inside.
     * Case 2: Particles outside.
@@ -223,7 +221,11 @@ __device__ double3 setNextPos(double3 nextpos, double3 A, double4 xi, double ste
     return nextpos;
 }
 
-__host__ void writeResults(double * hostdx2, double * hostdx4, double * mdx2, double * mdx4, double * hostSimP, double * w_swc, int iter, int size, int nrow, std::string outpath)
+// TODO : check new header
+__host__ void writeResults(double * w_swc, double * hostSimP, double * hostdx2, double * mdx2, double * hostdx4,
+                           double * mdx4, double * t, double * u_Reflections, double * u_uref, double * u_Sig0,
+                           double * u_SigRe, double * u_AllData,int iter, int size, int nrow, int sa_size,
+                           std::string outpath)
 {
   // Check outdir exists
   // isdir()?  mkdir : ...
@@ -233,26 +235,25 @@ __host__ void writeResults(double * hostdx2, double * hostdx4, double * mdx2, do
 
   *
   */
-  // Structure which would store the metadata
-  struct stat sb;
+    // Structure which would store the metadata
+    struct stat sb;
 
-  // Calls the function with path as argument
-// If the file/directory exists at the path returns 0
-  // If block executes if path exists
-  printf("Outpath: %s\n",outpath.c_str());
-  if (stat(outpath.c_str(), &sb) == 0)
+    // Calls the function with path as argument
+    // If the file/directory exists at the path returns 0
+    // If block executes if path exists
+    printf("Outpath: %s\n",outpath.c_str());
+    if (stat(outpath.c_str(), &sb) == 0)
     printf("Valid Path\n");
-  else
+    else
     if (mkdir(outpath.c_str(), 0777) == -1)
       std::cerr << "Error :  " << std::strerror(errno) << std::endl;
     else
       std::cout << "Directory created\n";
 
 
-
-  double t[iter];
-  double tstep = hostSimP[8];
-  for (int i = 0; i < iter; i++) {
+    double t[iter];
+    double tstep = hostSimP[8];
+    for (int i = 0; i < iter; i++) {
       t[i] = tstep * i;
       mdx2[6 * i + 0] = (hostdx2[6 * i + 0] / size) / (2.0 * t[i]);
       mdx2[6 * i + 1] = (hostdx2[6 * i + 1] / size) / (2.0 * t[i]);
@@ -275,49 +276,76 @@ __host__ void writeResults(double * hostdx2, double * hostdx4, double * mdx2, do
       mdx4[15 * i + 12] = (hostdx4[15 * i + 12] / size) / (2.0 * t[i]);
       mdx4[15 * i + 13] = (hostdx4[15 * i + 13] / size) / (2.0 * t[i]);
       mdx4[15 * i + 14] = (hostdx4[15 * i + 14] / size) / (2.0 * t[i]);
-  }
-  FILE * outFile;
+    }
+    FILE * outFile;
 
-  // outFile = fopen("./results/filename.bin", "wb");
-  // fwrite (hostAllData,sizeof(double),iter*size*3,outFile);
-  // fclose (outFile);
+    // outFile = fopen("./results/filename.bin", "wb");
+    // fwrite (hostAllData,sizeof(double),iter*size*3,outFile);
+    // fclose (outFile);
 
-  std::string dx2Path = outpath; dx2Path.append("/dx2.bin");
-  std::string mdx2Path = outpath; mdx2Path.append("/mdx2.bin");
-  std::string dx4Path = outpath; dx4Path.append("/dx4.bin");
-  std::string mdx4Path = outpath; mdx4Path.append("/mdx4.bin");
-  std::string swcpath = outpath; swcpath.append("/swc.bin");
-  std::string cfgpath = outpath; cfgpath.append("/outcfg.bin");
-  std::string tpath = outpath; tpath.append("/t.bin");
+    std::string dx2Path = outpath; dx2Path.append("/dx2.bin");
+    std::string mdx2Path = outpath; mdx2Path.append("/mdx2.bin");
+    std::string dx4Path = outpath; dx4Path.append("/dx4.bin");
+    std::string mdx4Path = outpath; mdx4Path.append("/mdx4.bin");
+    std::string swcpath = outpath; swcpath.append("/swc.bin");
+    std::string cfgpath = outpath; cfgpath.append("/outcfg.bin");
+    std::string tpath = outpath; tpath.append("/t.bin");
+    std::string reflectionsPath = outpath; reflectionsPath.append("/reflections.bin");
+    std::string urefPath = outpath; urefPath.append("/uref.bin");
+    std::string sig0Path = outpath; sig0Path.append("/sig0.bin");
+    std::string sigRePath = outpath; sigRePath.append("/sigRe.bin");
+    std::string allDataPath = outpath; allDataPath.append("/allData.bin");
 
 
-  outFile = fopen(swcpath.c_str(),"wb");
-  fwrite (w_swc,sizeof(double),nrow*4,outFile);
-  fclose(outFile);
+    outFile = fopen(swcpath.c_str(),"wb");
+    fwrite (w_swc,sizeof(double),nrow*4,outFile);
+    fclose(outFile);
 
-  outFile = fopen(cfgpath.c_str(),"wb");
-  fwrite (hostSimP,sizeof(double),10,outFile);
-  fclose(outFile);
+    outFile = fopen(cfgpath.c_str(),"wb");
+    fwrite (hostSimP,sizeof(double),10,outFile);
+    fclose(outFile);
 
-  outFile = fopen(dx2Path.c_str(),"wb");
-  fwrite (hostdx2,sizeof(double),6 * iter,outFile);
-  fclose(outFile);
+    outFile = fopen(dx2Path.c_str(),"wb");
+    fwrite (hostdx2,sizeof(double),6 * iter,outFile);
+    fclose(outFile);
 
-  outFile = fopen(mdx2Path.c_str(),"wb");
-  fwrite (mdx2,sizeof(double),6 * iter,outFile);
-  fclose(outFile);
+    outFile = fopen(mdx2Path.c_str(),"wb");
+    fwrite (mdx2,sizeof(double),6 * iter,outFile);
+    fclose(outFile);
 
-  outFile = fopen(dx4Path.c_str(),"wb");
-  fwrite (hostdx4,sizeof(double),15 * iter,outFile);
-  fclose(outFile);
+    outFile = fopen(dx4Path.c_str(),"wb");
+    fwrite (hostdx4,sizeof(double),15 * iter,outFile);
+    fclose(outFile);
 
-  outFile = fopen(mdx4Path.c_str(),"wb");
-  fwrite(mdx4,sizeof(double),15 * iter,outFile);
-  fclose(outFile);
+    outFile = fopen(mdx4Path.c_str(),"wb");
+    fwrite(mdx4,sizeof(double),15 * iter,outFile);
+    fclose(outFile);
 
-  outFile = fopen(tpath.c_str(),"wb");
-  fwrite(t,sizeof(double),iter,outFile);
-  fclose(outFile);
+    outFile = fopen(tpath.c_str(),"wb");
+    fwrite(t,sizeof(double),iter,outFile);
+    fclose(outFile);
+
+    outFile = fopen(reflectionsPath.c_str(), "wb");
+    fwrite(u_Reflections, sizeof(double), iter * size * 3, outFile);
+    fclose(outFile);
+
+    outFile = fopen(urefPath.c_str(), "wb");
+    fwrite(u_uref, sizeof(double), iter * size * 3, outFile);
+    fclose(outFile);
+
+    outFile = fopen(sig0Path.c_str(), "wb");
+    fwrite(u_Sig0, sizeof(double), timepoints, outFile);
+    fclose(outFile);
+
+    outFile = fopen(sigRePath.c_str(), "wb");
+    fwrite(u_SigRe, sizeof(double), Nbvec * iter, outFile);
+    fclose(outFile);
+
+    if (SaveAll) {
+        outFile = fopen(allDataPath.c_str(), "wb");
+        fwrite(u_AllData, sizeof(double),  3 * sa_size, outFile);
+        fclose(outFile);
+    }
 }
 
 __device__ void computeNext(double3 &A, double &step, double4 &xi, double3 &nextpos, double &pi) {
@@ -463,3 +491,89 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
         flips[fidx] += 1; // no need for atomicAdd since gid is what is parallelized
     }
 }
+
+__device__ __host__ void setup_data(double * u_dx2, double * u_dx4, double * u_SimP, double4 * u_D4Swc, int * u_NewLut,
+                                    int * u_NewIndex, int * u_Flip, double * simparam, double4 * swc_trim, int * lut,
+                                    int * indexarr, int * bounds, int nrow, int prod, int newindexsize, int sa_size, int Nbvec, int timepoints, int NC) {
+    // Set Values for Host
+    {
+        memset(u_dx2, 0.0, 6 * iter * sizeof(double));
+        memset(u_dx4, 0.0, 15 * iter * sizeof(double));
+
+        {
+            for (int i = 0; i < 10; i++) {
+                u_SimP[i] = simparam[i];
+            }
+            for (int i = 0; i < nrow; i++) {
+                u_D4Swc[i].x = swc_trim[i].x;
+                u_D4Swc[i].y = swc_trim[i].y;
+                u_D4Swc[i].z = swc_trim[i].z;
+                u_D4Swc[i].w = swc_trim[i].w;
+            }
+            for (int i = 0; i < prod; i++) {
+                u_NewLut[i] = lut[i];
+            }
+            for (int i = 0; i < newindexsize; i++) {
+                u_NewIndex[i] = indexarr[i];
+            }
+        }
+
+        memset(mdx2, 0.0, 6 * iter * sizeof(double));
+        memset(mdx4, 0.0, 15 * iter * sizeof(double));
+        memset(u_AllData, 0.0, 3 * sa_size * sizeof(double));
+        memset(u_Reflections, 0.0, 3 * iter * size * sizeof(double));
+        memset(u_Uref, 0.0, 3 * iter * size * sizeof(double));
+        memset(u_Flip, 0.0, 3 * iter * sizeof(int));
+        memset(u_T2, 0.0, NC * sizeof(double));                            // T2 is read from file?
+        memset(u_T, 0.0, NC * sizeof(double));                             // T is set to 0.0
+        memset(u_SigRe, 0.0, Nbvec * timepoints * sizeof(double));         // Calculated in kernel
+        memset(u_Sig0, 0.0, timepoints * sizeof(double));                  // Calculated in kernel
+        memset(u_bvec, 0.0, Nbvec * 3 * sizeof(double));                   // bvec is read from file
+        memset(u_bval, 0.0, Nbvec * sizeof(double));                       // bval is read from file
+        memset(u_TD, 0.0,   Nbvec * sizeof(double));                       // TD is read from file
+        printf("Set Host Values\n");
+    }
+}
+
+// Set Values for Host
+/*    {
+    memset(u_dx2, 0.0, 6 * iter * SOD);
+    memset(u_dx4, 0.0, 15 * iter * SOD);
+    {
+
+        for (int i = 0; i < 10; i++) {
+            u_SimP[i] = simparam[i];
+        }
+
+        for (int i = 0; i < nrow; i++) {
+            u_D4Swc[i].x = swc_trim[i].x;
+            u_D4Swc[i].y = swc_trim[i].y;
+            u_D4Swc[i].z = swc_trim[i].z;
+            u_D4Swc[i].w = swc_trim[i].w;
+        }
+
+        for (int i = 0; i < prod; i++) {
+            int value = lut[i];
+            u_NewLut[i] = value;
+        }
+
+        for (int i = 0; i < indexarr.size(); i++) {
+            int value = indexarr[i];
+            u_NewIndex[i] = value;
+        }
+    }
+    memset(mdx2, 0.0, 6 * iter * SOD);
+    memset(mdx4, 0.0, 15 * iter * SOD);
+    memset(u_AllData, 0.0, 3 * sa_size * SOD);
+    memset(u_Reflections, 0.0, 3 * iter * size * SOD);
+    memset(u_uref, 0.0, 3 * iter * size * SOD);
+    memset(u_Flip, 0.0, 3 * size * SOI);
+    memset(u_T2, 0.0, Nc * SOD); // T2 is read from file?
+    memset(u_T, 0.0, Nc * SOD); // T is set to 0.0
+    memset(u_SigRe, 0.0, Nbvec * timepoints * SOD); // Calculated in kernel
+    memset(u_Sig0, 0.0, timepoints * SOD); // Calculated in kernel
+    memset(u_bvec, 0.0, Nbvec * 3 * SOD); // bvec is read from file
+    memset(u_bval, 0.0, Nbvec * SOD); // bval is read from file
+    memset(u_TD, 0.0, Nbvec * SOD); // TD is read from file
+    printf("Set Host Values\n");
+}*/

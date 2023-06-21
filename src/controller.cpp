@@ -111,9 +111,6 @@ void controller::Setup(std::string inpath,std::string outpath, int c)
 
 void controller::Setup(int argc, char ** argv, int c)
 {
-
-
-
     std::map<std::string, Controls> map{
             {"c", Controls::Commands},
             {"h", Controls::Help},
@@ -332,53 +329,6 @@ void controller::start() {
            break;
         }
     }
-
-
-    // calculate Memory required for operation
-    // hostBounds = (int *) malloc(3 * sizeof(int));
-    // hostdx2 = (double *) malloc(6 * iter * sizeof(double));
-    // hostdx4 = (double *) malloc(15 * iter * sizeof(double));
-    // hostSimP = (double *) malloc(10 * sizeof(double));
-    // hostD4Swc = (double4 *) malloc(nrow * sizeof(double4));
-    // hostNewLut = (int *) malloc(prod * sizeof(int));
-    // hostNewIndex = (int *) malloc(newindexsize * sizeof(int));
-    // hostIndexSize = (int *) malloc(3 * sizeof(int));
-    // mdx2 = (double *) malloc(6 * iter * sizeof(double));
-    // mdx4 = (double *) malloc(15 * iter * sizeof(double));
-    // hostAllData = (double *) malloc(3 * iter * size * sizeof(double));
-
-    // int HOST_MEM_USE;
-    // int *
-    // 3
-    // prod
-    // newindexsize
-    // 3
-
-    // double *
-    // 6 * iter
-    // 15 * iter
-    // 10
-    // 6 * iter
-    // 15 * iter
-    // 3 * iter * size
-
-    // double4 *
-    // nrow
-
-    // hostBounds = (int *) malloc(3 * sizeof(int));
-    // hostdx2 = (double *) malloc(6 * iter * sizeof(double));
-    // hostdx4 = (double *) malloc(15 * iter * sizeof(double));
-    // hostSimP = (double *) malloc(10 * sizeof(double));
-    // hostD4Swc = (double4 *) malloc(nrow * sizeof(double4));
-    // hostNewLut = (int *) malloc(prod * sizeof(int));
-    // hostNewIndex = (int *) malloc(newindexsize * sizeof(int));
-    // hostIndexSize = (int *) malloc(3 * sizeof(int));
-    // mdx2 = (double *) malloc(6 * iter * sizeof(double));
-    // mdx4 = (double *) malloc(15 * iter * sizeof(double));
-    // hostAllData = (double *) malloc(3 * iter * size * sizeof(double));
-
-
-
 }
 
 simulation controller::getSim()
