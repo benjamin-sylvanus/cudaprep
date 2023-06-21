@@ -15,6 +15,9 @@
 #include <sys/stat.h>
 #include "overloads.h" 
 
+// TODO: Figure out where to extract distance
+// Signature Change
+// __device bool swc2v(double3 nextpos, double4 child, double4 parent, double dist, double &D)
 __device__ bool swc2v(double3 nextpos, double4 child, double4 parent, double dist) {
     bool pos;
     double cr2;
@@ -24,13 +27,12 @@ __device__ bool swc2v(double3 nextpos, double4 child, double4 parent, double dis
       pr2 = pow(parent.w, 2);
       pos = (pow(nextpos.x - child.x, 2) + pow(nextpos.y - child.y, 2) + pow(nextpos.z - child.z, 2)) < cr2 ||
                    (pow(nextpos.x - parent.x, 2) + pow(nextpos.y - parent.y, 2) + pow(nextpos.z - parent.z, 2)) < pr2;
-        // dist = 0.000000000000000001;
     }
     else
     {
     double t = ((nextpos.x - child.x) * (parent.x - child.x) + (nextpos.y - child.y) * (parent.y - child.y) +
                 (nextpos.z - child.z) * (parent.z - child.z)) / dist;
-    // printf("t: %f\n", t);
+
     double x = child.x + (parent.x - child.x) * t;
     double y = child.y + (parent.y - child.y) * t;
     double z = child.z + (parent.z - child.z) * t;
@@ -39,17 +41,33 @@ __device__ bool swc2v(double3 nextpos, double4 child, double4 parent, double dis
     double L = sqrt(pow(parent.x-child.x,2) + pow(parent.y-child.y,2) + pow(parent.z-child.z,2));
     double sin_theta = fabs(child.w - parent.w)/L;
     double cos_theta = sqrt(1-pow(sin_theta,2));
+
+    // Determine the case
     bool list1 = (t > ( (child.w * sin_theta) / L)) && (t < (1 + (parent.w * sin_theta) / L));
     if (list1)
+    // Case 1: Point Lies Between Centers
     {
-      double dist2 = (pow(nextpos.x - x, 2) + pow(nextpos.y - y, 2) + pow(nextpos.z - z, 2));
-      double m = (parent.w-child.w) * cos_theta/(L+(parent.w-child.w)*sin_theta);
-      double rx = L * t;
-      double ry = m * rx + (cos_theta - m * sin_theta) * child.w;
-      pos = dist2 < pow(ry,2);
+        double dist2 = (pow(nextpos.x - x, 2) + pow(nextpos.y - y, 2) + pow(nextpos.z - z, 2));
+        double m = (parent.w-child.w) * cos_theta/(L+(parent.w-child.w)*sin_theta);
+        double rx = L * t;
+        double ry = m * rx + (cos_theta - m * sin_theta) * child.w;
+        pos = dist2 < pow(ry,2);
+        // TODO Calc intersection or distance past.
     }
-    else
-    {
+
+
+    // Case 2 Inside Sphere
+    // Distance:
+    // v = ci -> ri
+    // n = ci -> pi
+    // ci: Center
+    // ri: Radius
+    // pi: Point
+
+
+
+
+    else {
       pos = (pow(nextpos.x - child.x, 2) + pow(nextpos.y - child.y, 2) + pow(nextpos.z - child.z, 2)) < cr2 ||
              (pow(nextpos.x - parent.x, 2) + pow(nextpos.y - parent.y, 2) + pow(nextpos.z - parent.z, 2)) < pr2;
     }
@@ -330,6 +348,7 @@ __device__ void computeNext(double3 &A, double &step, double4 &xi, double3 &next
     nextpos.z = A.z + (step * cos_phi);
 }
 
+
 __device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos, int *NewIndex, double4 *d4swc, double &fstep) {
     int3 vindex;
     double4 child, parent;
@@ -355,10 +374,13 @@ __device__ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos
             dist2 = distance2(parent, child);
 
             // determine whether particle is inside this connection
+            // Signature Change
+            // bool inside = swc2v(nextpos, child, parent, dist, D)
             bool inside = swc2v(nextpos, child, parent, dist2);
 
             // if it is inside the connection we don't need to check the remaining.
             if (inside) {
+
                 return true;
             }
         }
@@ -448,7 +470,12 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
         double3 intersection = intersectionPoint;
         nextpos = intersectionPoint + reflectionVector;
 
-        printf("NextPos: %f %f %f -> %f %f %f\n", nextpos.x, nextpos.y, nextpos.z, intersectionPoint.x+reflectionVector.x, intersectionPoint.y + reflectionVector.y, intersectionPoint.z + reflectionVector.z);
+        printf("NextPos: %f %f %f -> %f %f %f\n",
+               nextpos.x, nextpos.y, nextpos.z,
+               intersectionPoint.x + reflectionVector.x,
+               intersectionPoint.y + reflectionVector.y,
+               intersectionPoint.z + reflectionVector.z);
+
         printf("Count: %d\n", count);
         count += 1;
 
