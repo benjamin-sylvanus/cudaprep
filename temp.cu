@@ -167,7 +167,8 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
             validCoord(nextpos, A, b_int3, upper, lower, floorpos, Reflections, Uref, gid, i, size, iter, flip);
             floorpos = make_int3((int) nextpos.x, (int) nextpos.y, (int) nextpos.z);
             int test_lutvalue = nlut[s2i(floorpos,b_int3)];
-            parstate.y = checkConnections(i_int3, test_lutvalue, nextpos, NewIndex, d4swc, fstep); // check if particle inside
+            bool inside = checkConnections(i_int3, test_lutvalue, nextpos, NewIndex, d4swc, fstep); // check if particle inside
+            parstate.y = (inside) ? 1 : 0;
 
             /**
             * @cases particle inside? 0 0 - update
@@ -247,16 +248,16 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
                     s0 = exp(-1.0 * s0);
                     atomicAdd(&Sig0[tidx],s0);
 
-                    // Signal
-                    for(int j = 0; j < Nbvec; j++)
-                    {
-                        // access b value and b vector
-                        double bval = bvalues[j];
-                        double3 bvec =  bvectors[j];
-                        td = TD[tidx];
-                        qx = sqrt(b.w/td) * dot(d2,bvec)
-                        atomicAdd(&sigRe[Nbvec * tidx + j], s0 * cos(qx));
-                    }
+                    // // Signal
+                    // for(int j = 0; j < Nbvec; j++)
+                    // {
+                    //     // access b value and b vector
+                    //     double bval = bvalues[j];
+                    //     double3 bvec =  bvectors[j];
+                    //     td = TD[tidx];
+                    //     qx = sqrt(b.w/td) * dot(d2,bvec)
+                    //     atomicAdd(&sigRe[Nbvec * tidx + j], s0 * cos(qx));
+                    // }
 
                     for (int j = 0; j < Nc; j++)
                     {
@@ -304,6 +305,7 @@ int main(int argc, char *argv[]) {
     SaveAll = sim.getSaveAll();
     // ternary operator to get the size for saving all
     int sa_size = (SaveAll) ? size * iter : 1;
+    int NC = 2;
 
     for (int i = 0; i < 10; i++) {
         double value = simulationparams[i];
@@ -377,8 +379,9 @@ int main(int argc, char *argv[]) {
     printf("Allocated Host Data\n");
 
     // Call Function to Set the Values for Host
-    setup_data(u_dx2, u_dx4, u_SimP, u_D4Swc, u_NewLut, u_NewIndex,  u_Flip,  simparam,  swc_trim, lut,
-    indexarr, bounds, nrow, prod, newindexsize, sa_size, Nbvec, timepoints, NC);
+    setup_data(u_dx2, u_dx4, u_SimP, u_D4Swc, u_NewLut, u_NewIndex, u_Flip,  simparam, swc_trim, mdx2, mdx4,
+               u_AllData, u_Reflections,u_uref, u_T2, u_T, u_SigRe, u_Sig0, u_bvec, u_bval, u_TD,
+               lut, indexarr, bounds, size, iter, nrow, prod, newindexsize, sa_size, Nbvec, timepoints, NC);
 
     // Create Random State Pointer Pointers
     curandStatePhilox4_32_10_t *deviceState;
@@ -392,7 +395,7 @@ int main(int argc, char *argv[]) {
 
     // option for printing in kernel
     bool debug = false;
-    double3 point = make_double3(hostD4Swc[0].x, hostD4Swc[0].y, hostD4Swc[0].z);
+    double3 point = make_double3(u_D4Swc[0].x, u_D4Swc[0].y, u_D4Swc[0].z);
     int3 u_Bounds = make_int3(boundx, boundy, boundz);
     int3 u_IndexSize = make_int3(index_dims[0], index_dims[1], index_dims[2]);
 
@@ -423,8 +426,8 @@ int main(int argc, char *argv[]) {
     {
         printf("Simulating...\n");
         simulate<<<grid, block>>>(u_AllData, u_dx2, u_dx4, u_Bounds, deviceState, u_SimP,
-                                  u_d4Swc, u_NewLut, u_NewIndex, u_IndexSize, size,
-                                  iter, debug, point,SaveAll, u_Reflections, u_URef, u_Flip,
+                                  u_D4Swc, u_NewLut, u_NewIndex, u_IndexSize, size,
+                                  iter, debug, point,SaveAll, u_Reflections, u_uref, u_Flip,
                                   u_T2, u_T, u_Sig0, u_SigRe, u_bvec, u_bval, u_TD);
         cudaEventRecord(stop_c);
     }
@@ -438,22 +441,20 @@ int main(int argc, char *argv[]) {
     printf("Copying back to Host\n");
     cudaEventSynchronize(stop_c);
     cudaEventElapsedTime(&milliseconds, start_c, stop_c);
-    end = clock();
+    clock_t end = clock();
     printf("Kernel took %f seconds\n", milliseconds / 1e3);
     printf("Writing results: ");
+
+    auto t1 = high_resolution_clock::now();
     // Write Results
     {
         std::string outpath = sim.getResultPath();
-        t1 = high_resolution_clock::now();
-        // writeResults(u_dx2, u_dx4, mdx2, mdx4, u_SimP, w_swc, iter, size, nrow, outpath);
-        writeResults(w_swc, hostSimP, hostdx2, mdx2, hostdx4,
-                 mdx4, t, u_Reflections, u_uref, u_Sig0,
-                 u_SigRe, u_AllData,iter, size, nrow, sa_size, outpath);
+        writeResults(w_swc, u_SimP, u_dx2, mdx2, u_dx4, mdx4, u_T, u_Reflections,  u_uref,  u_Sig0, u_SigRe, u_AllData, iter, size, nrow, timepoints, Nbvec, sa_size, SaveAll,outpath);
 
     }
 
-    t2 = high_resolution_clock::now();
-    ms_double = t2 - t1;
+    auto t2 = high_resolution_clock::now();
+    duration<double, std::milli> ms_double = t2 - t1;
     printf("%f seconds\n", ms_double.count() / 1e3);
 
     // Free Memory
@@ -462,14 +463,16 @@ int main(int argc, char *argv[]) {
         gpuErrchk(cudaFree(u_dx2));
         gpuErrchk(cudaFree(u_dx4));
         gpuErrchk(cudaFree(u_SimP));
-        gpuErrchk(cudaFree(u_d4Swc));
+        gpuErrchk(cudaFree(u_D4Swc));
         gpuErrchk(cudaFree(u_NewLut));
         gpuErrchk(cudaFree(u_NewIndex));
         gpuErrchk(cudaFree(u_AllData));
+
         // Reflection Variables
         gpuErrchk(cudaFree(u_Reflections));
-        gpuErrchk(cudaFree(u_URef));
+        gpuErrchk(cudaFree(u_uref));
         gpuErrchk(cudaFree(u_Flip));
+
         // Signal Variables
         gpuErrchk(cudaFree(u_T2));
         gpuErrchk(cudaFree(u_T));
