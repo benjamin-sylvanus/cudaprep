@@ -102,8 +102,8 @@ __device__ double3
  __host__ void
  writeResults(double * w_swc, double * hostSimP, double * hostdx2, double * mdx2, double * hostdx4,
                                     double * mdx4, double * t, double * u_Reflections, double * u_uref, double * u_Sig0,
-                                    double * u_SigRe, double * u_AllData,int iter, int size, int nrow, int sa_size,
-                                    std::string outpath)
+                                    double * u_SigRe, double * u_AllData,int iter, int size, int nrow,int timepoints, int Nbvec, int sa_size, int SaveAll,
+                                    std::string outpath);
 
  /**
   * @brief Compute the next position of the particle
@@ -167,6 +167,10 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
  * @param NC number of connections
  * @brief Sets up the data for the simulation
  */
-__device__ __host__ void setup_data(double * u_dx2, double * u_dx4, double * u_SimP, double3 * u_D4Swc, int * u_NewLut,
-                                    int * u_NewIndex, int * u_Flip, double * simparam, double3 * swc_trim, int * lut,
-                                    int * indexarr, int * bounds, int nrow, int prod, int newindexsize, int sa_size, int Nbvec, int timepoints, int NC);
+__host__ void setup_data(double * u_dx2, double * u_dx4, double * u_SimP, double4 * u_D4Swc, int * u_NewLut,
+                                    int * u_NewIndex, int * u_Flip, double * simparam, double4 * swc_trim,
+                                    double * mdx2, double * mdx4, double * u_AllData,double * u_Reflections, 
+                                    double * u_Uref, double * u_T2, double * u_T, double * u_SigRe, double * u_Sig0,
+                                    double * u_bvec, double * u_bval, double * u_TD, std::vector<uint64_t> lut, std::vector<uint64_t> indexarr, 
+                                    std::vector<uint64_t> bounds, int size, int iter, int nrow, int prod, int newindexsize, int sa_size, int Nbvec, int timepoints, int NC);
+ 

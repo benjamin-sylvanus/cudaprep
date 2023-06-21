@@ -345,6 +345,7 @@ int main(int argc, char *argv[]) {
     iter = sim.getStep_num();
     std::vector<double> simulationparams = sim.getParameterdata();
     SaveAll = sim.getSaveAll();
+    int sa_size = (SaveAll) ? size * iter : 1;
 
     for (int i = 0; i < 10; i++) {
         double value = simulationparams[i];
@@ -427,11 +428,7 @@ int main(int argc, char *argv[]) {
         hostNewIndex = (int *) malloc(newindexsize * SOI);
         mdx2 = (double *) malloc(6 * iter * SOD);
         mdx4 = (double *) malloc(15 * iter * SOD);
-        if (SaveAll) {
-            hostAllData = (double *) malloc(3 * iter * size * SOD);
-        } else {
-            hostAllData = (double *) malloc(3 * SOD);
-        }
+        hostAllData = (double *) malloc(3 * sa_size * SOD);
         hostReflections = (double *) malloc(3 *iter * size * SOD);
         hosturef = (double *) malloc(3 *iter * size * SOD);
         hostFlip = (int *) malloc(3 * size * SOI);
@@ -546,11 +543,7 @@ int main(int argc, char *argv[]) {
         gpuErrchk(cudaMalloc((double4 * *) & deviced4Swc, nrow * SOD4));
         gpuErrchk(cudaMalloc((int **) &deviceNewLut, prod * SOI));
         gpuErrchk(cudaMalloc((int **) &deviceNewIndex, newindexsize * SOI));
-        if (SaveAll) {
-            gpuErrchk(cudaMalloc((double **) &deviceAllData, 3 * iter * size * SOD));
-        } else {
-            gpuErrchk(cudaMalloc((double **) &deviceAllData, 3 * SOD));
-        }
+        gpuErrchk(cudaMalloc((double **) &deviceAllData, 3 * sa_size * SOD));
         gpuErrchk(cudaMalloc((double **) &deviceReflections, 3 * iter * size * SOD));
         gpuErrchk(cudaMalloc((double **) &deviceURef, 3 * iter * size * SOD));
         gpuErrchk(cudaMalloc((int **) &deviceFlip, 3 * size * SOI));
@@ -576,11 +569,7 @@ int main(int argc, char *argv[]) {
         gpuErrchk(cudaMemcpy(deviced4Swc, hostD4Swc, nrow * SOD4, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(deviceNewLut, hostNewLut, prod * SOI, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(deviceNewIndex, hostNewIndex, newindexsize * SOI, cudaMemcpyHostToDevice));
-        if (SaveAll) {
-            gpuErrchk(cudaMemcpy(deviceAllData, hostAllData, 3 * iter * size * SOD, cudaMemcpyHostToDevice));
-        } else {
-            gpuErrchk(cudaMemcpy(deviceAllData, hostAllData, 3 * SOD, cudaMemcpyHostToDevice));
-        }
+        gpuErrchk(cudaMemcpy(deviceAllData, hostAllData, 3 * sa_size * SOD, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(deviceReflections, hostReflections, 3 * iter * size * SOD, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(deviceURef, hosturef, 3 * iter * size * SOD, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpy(deviceFlip, hostFlip, 3 * size * SOI, cudaMemcpyHostToDevice));
@@ -637,11 +626,8 @@ int main(int argc, char *argv[]) {
 
         gpuErrchk(cudaMemcpy(hostdx2, devicedx2, 6 * iter * SOD, cudaMemcpyDeviceToHost));
         gpuErrchk(cudaMemcpy(hostdx4, devicedx4, 15 * iter * SOD, cudaMemcpyDeviceToHost));
-        if (SaveAll) {
-            gpuErrchk(cudaMemcpy(hostAllData, deviceAllData, 3 * iter * size * SOD, cudaMemcpyDeviceToHost));
-        } else {
-            gpuErrchk(cudaMemcpy(hostAllData, deviceAllData, 3 * SOD, cudaMemcpyDeviceToHost));
-        }
+        gpuErrchk(cudaMemcpy(hostAllData, deviceAllData, 3 * sa_size * SOD, cudaMemcpyDeviceToHost));
+
         // Reflection Variables
         gpuErrchk(cudaMemcpy(hostReflections, deviceReflections, 3 * iter * size * SOD, cudaMemcpyDeviceToHost));
         gpuErrchk(cudaMemcpy(hosturef, deviceURef, 3 * iter * size * SOD, cudaMemcpyDeviceToHost));
@@ -731,37 +717,38 @@ int main(int argc, char *argv[]) {
 
         std::string outpath = sim.getResultPath();
         t1 = high_resolution_clock::now();
-        writeResults(hostdx2, hostdx4, mdx2, mdx4, hostSimP, w_swc, iter, size, nrow, outpath);
-        std::string allDataPath = outpath;
-        if (SaveAll) {
-            allDataPath.append("/allData.bin");
-            FILE *outFile = fopen(allDataPath.c_str(), "wb");
-            fwrite(hostAllData, SOD, iter * size * 3, outFile);
-            fclose(outFile);
-        }
-        // write reflections and uref
-        std::string reflectionsPath = outpath;
-        reflectionsPath.append("/reflections.bin");
-        FILE *outFile = fopen(reflectionsPath.c_str(), "wb");
-        fwrite(hostReflections, SOD, iter * size * 3, outFile);
-        fclose(outFile);
-        std::string urefPath = outpath;
-        urefPath.append("/uref.bin");
-        outFile = fopen(urefPath.c_str(), "wb");
-        fwrite(hosturef, SOD, iter * size * 3, outFile);
-        fclose(outFile);
 
-        // write sig0 and sigRe
-        std::string sig0Path = outpath;
-        sig0Path.append("/sig0.bin");
-        outFile = fopen(sig0Path.c_str(), "wb");
-        fwrite(hostSig0, SOD, timepoints, outFile);
-        fclose(outFile);
-        std::string sigRePath = outpath;
-        sigRePath.append("/sigRe.bin");
-        outFile = fopen(sigRePath.c_str(), "wb");
-        fwrite(hostSigRe, SOD, Nbvec * iter, outFile);
-        fclose(outFile);
+    writeResults(w_swc, hostSimP, hostdx2, mdx2, hostdx4, mdx4, hostT, hostReflections,  hosturef,  hostSig0, hostSigRe, hostAllData, iter, size, nrow, timepoints, Nbvec, sa_size, SaveAll,outpath);
+        // std::string allDataPath = outpath;
+        // if (SaveAll) {
+        //     allDataPath.append("/allData.bin");
+        //     FILE *outFile = fopen(allDataPath.c_str(), "wb");
+        //     fwrite(hostAllData, SOD, iter * size * 3, outFile);
+        //     fclose(outFile);
+        // }
+        // // write reflections and uref
+        // std::string reflectionsPath = outpath;
+        // reflectionsPath.append("/reflections.bin");
+        // FILE *outFile = fopen(reflectionsPath.c_str(), "wb");
+        // fwrite(hostReflections, SOD, iter * size * 3, outFile);
+        // fclose(outFile);
+        // std::string urefPath = outpath;
+        // urefPath.append("/uref.bin");
+        // outFile = fopen(urefPath.c_str(), "wb");
+        // fwrite(hosturef, SOD, iter * size * 3, outFile);
+        // fclose(outFile);
+
+        // // write sig0 and sigRe
+        // std::string sig0Path = outpath;
+        // sig0Path.append("/sig0.bin");
+        // outFile = fopen(sig0Path.c_str(), "wb");
+        // fwrite(hostSig0, SOD, timepoints, outFile);
+        // fclose(outFile);
+        // std::string sigRePath = outpath;
+        // sigRePath.append("/sigRe.bin");
+        // outFile = fopen(sigRePath.c_str(), "wb");
+        // fwrite(hostSigRe, SOD, Nbvec * iter, outFile);
+        // fclose(outFile);
     }
 
     t2 = high_resolution_clock::now();
