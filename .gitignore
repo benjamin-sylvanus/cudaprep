@@ -6,6 +6,12 @@
 /cmake-build-debug
 /cmake-build-debug-event-trace
 .idea
+CMakeCache.txt
+
+CMakeFiles/
+cmake_install.cmake
+./Makefile
+Makefile copy
 
 # Editor-based HTTP Client requests
 /httpRequests/
