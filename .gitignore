@@ -7,7 +7,7 @@
 /cmake-build-debug-event-trace
 .idea
 CMakeCache.txt
-
+_deps/
 CMakeFiles/
 cmake_install.cmake
 ./Makefile
