@@ -64,6 +64,104 @@ __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long se
     curand_init(seed, idx, 0, &state[idx]);
 }
 
+/**
+ * @brief determine the volume fraction via random sampling over n particles
+ * @param state
+ * @param Bounds
+ * @param d4swc
+ * @param nlut
+ * @param NewIndex
+ * @param IndexSize
+ * @param n
+ * @param label
+ * @param vf
+ */
+__global__ void volfrac(curandStatePhilox4_32_10_t *state, int3 Bounds, double4 *d4swc, int *nlut, int *NewIndex, int3 IndexSize, int n, int *label, double *vf) {
+    int gid = threadIdx.x + blockDim.x * blockIdx.x;
+    if (gid < n) {
+        label[gid] = 0;
+        int R = 0;
+        double3 nextpos;
+        int3 upper;
+        int3 lower;
+        int3 floorpos;
+        int3 b_int3 = make_int3(Bounds.x, Bounds.y, Bounds.z);
+        int3 i_int3 = make_int3(IndexSize.x, IndexSize.y, IndexSize.z);
+        double3 b_d3 = make_double3((double)b_int3.x, (double)b_int3.y, (double)b_int3.z);
+        curandStatePhilox4_32_10_t localstate = state[gid];
+        double4 xr;
+        double3 A;
+        bool cont = true;
+        // init local state var
+        xr = curand_uniform4_double(&localstate);
+
+        // set particle initial position
+        A = make_double3(xr.x * b_d3.x, xr.y * b_d3.y, xr.z * b_d3.z);
+
+        nextpos = A;
+
+        // floor of position -> check voxels
+        floorpos.x = (int)A.x;
+        floorpos.y = (int)A.y;
+        floorpos.z = (int)A.z;
+
+        // upper bounds of lookup table
+        upper.x = floorpos.x < b_int3.x;
+        upper.y = floorpos.y < b_int3.y;
+        upper.z = floorpos.z < b_int3.z;
+
+        // lower bounds of lookup table
+        lower.x = floorpos.x > 0;
+        lower.y = floorpos.y > 0;
+        lower.z = floorpos.z > 0;
+
+        double4 parent;
+        double4 child;
+        int2 vindex;
+        int id_test = s2i(floorpos, Bounds);
+        int test_lutvalue = nlut[id_test];
+        double dist2;
+
+        // loop over connections
+        for (int page = 0; page < i_int3.z; page++) {
+            int3 c_new = make_int3(test_lutvalue, 0, page);
+            int3 p_new = make_int3(test_lutvalue, 1, page);
+            vindex.x = NewIndex[s2i(c_new, i_int3)] - 1;
+            vindex.y = NewIndex[s2i(p_new, i_int3)] - 1;
+            // if theres a index
+            if ((vindex.x) != -1) {
+                child = make_double4(d4swc[vindex.x].x, d4swc[vindex.x].y, d4swc[vindex.x].z, d4swc[vindex.x].w);
+                parent = make_double4(d4swc[vindex.y].x, d4swc[vindex.y].y, d4swc[vindex.y].z, d4swc[vindex.y].w);
+
+                //distance squared between child parent
+                dist2 = pow(parent.x - child.x, 2) + pow(parent.y - child.y, 2) + pow(parent.z - child.z, 2);
+
+                // determine whether particle is inside this connection
+                bool inside = swc2v(nextpos, child, parent, dist2);
+
+                // if it is inside the connection we don't need to check the remaining.
+                if (inside) {
+                    // update the particles state
+                    label[gid] = 1;
+                    // end for p loop
+                    page = i_int3.z;
+                }
+            }
+        }
+        state[gid] = localstate; // Update the random state for the thread
+    }
+
+    __syncthreads(); // Correct synchronization function
+
+    // sum the particles inside and calculate volume fraction
+    if (gid == 0) {
+        int R = 0;
+        for (int i = 0; i < size; i++) {
+            R += label[i];
+        }
+        *vf = (double)R / (double)size; // Update the volume fraction using pointer
+    }
+}
 
 /**
  * @brief Simulation Kernel for the GPU
@@ -357,6 +455,9 @@ int main(int argc, char *argv[]) {
     int *u_NewLut, *u_NewIndex, *u_Flip;
     double4 *u_D4Swc;
 
+    //new
+    int *u_label; double *vf;
+
     cudaMallocManaged(&u_dx2, 6 * iter * SOD);
     cudaMallocManaged(&u_dx4, 15 * iter * SOD);
     cudaMallocManaged(&u_SimP, 10 * SOD);
@@ -376,6 +477,7 @@ int main(int argc, char *argv[]) {
     cudaMallocManaged(&u_NewIndex, newindexsize * SOI);
     cudaMallocManaged(&u_Flip, 3 * size * SOI);
     cudaMallocManaged(&u_D4Swc, nrow * SOD4);
+    //
     printf("Allocated Host Data\n");
 
     // Call Function to Set the Values for Host
@@ -420,6 +522,23 @@ int main(int argc, char *argv[]) {
     cudaMemPrefetchAsync(&u_Flip, 3 * size * SOI, cudaCpuDeviceId);
     cudaMemPrefetchAsync(&u_D4Swc, nrow * SOD4, cudaCpuDeviceId);
 
+    // new
+    cudaMemPrefetchAsync(&u_label, nrow * SOI, cudaCpuDeviceId);
+    cudaMemPrefetchAsync(&u_vf, nrow * SOD, cudaCpuDeviceId);
+
+    // determine the volume fraction
+    volfrac<<<grid, block>>>(state, Bounds, d4swc, nlut, NewIndex, IndexSize, n, u_label, u_vf);
+    cudaEventRecord(stop_c);
+    cudaDeviceSynchronize();
+    cudaEventSynchronize(stop_c);
+    cudaEventElapsedTime(&milliseconds, start_c, stop_c);
+    printf("Volume Fraction Kernel took %f seconds\n", milliseconds / 1e3);
+    printf("Volume Fraction: %d\n", vf[0]);
+    printf("Freeing Device Data\n");
+    // Free Device Memory
+    gpuErrchk(cudaFree(u_label));
+    gpuErrchk(cudaFree(u_vf));
+
     /**
      * Call Kernel
     */
@@ -431,6 +550,7 @@ int main(int argc, char *argv[]) {
                                   u_T2, u_T, u_Sig0, u_SigRe, u_bvec, u_bval, u_TD);
         cudaEventRecord(stop_c);
     }
+
 
     // Wait for results
     cudaDeviceSynchronize();
@@ -482,6 +602,7 @@ int main(int argc, char *argv[]) {
         gpuErrchk(cudaFree(u_bval));
         gpuErrchk(cudaFree(u_TD));
         gpuErrchk(cudaFree(deviceState));
+
     }
 
     printf("Done!\n");
