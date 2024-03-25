@@ -84,6 +84,7 @@ __device__ double3 initPosition(int gid, double *dx2, int3 &Bounds, curandStateP
     * Case 1: particles inside.
     * Case 2: Particles outside.
     * Case 3: Particles at point.
+    * Case 4: Particles everywhere based on concentration ratio
 
     Case 1 done
     Case 2:
@@ -425,6 +426,7 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
         // point on plane
         double3 pointOnPlane;
 
+        // par hit boundary, flip sign of that x,y,z. 
         if (LOWER.x) {
             fidx = 6*gid + 0;
             pointOnPlane = make_double3(Low.x, nextpos.y, nextpos.z);
@@ -458,8 +460,8 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
         else {
             return; // no reflection needed
         }
-
-        // Calculate D  (Ax + By + Cz + D = 0)
+        // 
+        // Calculate D  (Ax + By + Cz + D = 0) 
         double D = -(dot(normal, pointOnPlane));
 
         double3 intersectionPoint;
