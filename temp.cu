@@ -78,7 +78,12 @@ __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long se
  */
 __global__ void volfrac(curandStatePhilox4_32_10_t *state, int3 Bounds, double4 *d4swc, int *nlut, int *NewIndex, int3 IndexSize, int n, int *label, double *vf) {
     int gid = threadIdx.x + blockDim.x * blockIdx.x;
-    if (gid < n) {
+    int N=10000000;
+    if (gid==0) {
+            printf("ok %d\n",n);
+    }
+    if (gid < N) {
+
         label[gid] = 0;
         int R = 0;
         double3 nextpos;
@@ -134,7 +139,7 @@ __global__ void volfrac(curandStatePhilox4_32_10_t *state, int3 Bounds, double4 
                 parent = make_double4(d4swc[vindex.y].x, d4swc[vindex.y].y, d4swc[vindex.y].z, d4swc[vindex.y].w);
 
                 //distance squared between child parent
-                dist2 = pow(parent.x - child.x, 2) + pow(parent.y - child.y, 2) + pow(parent.z - child.z, 2);
+                dist2 = distance2(parent, child);
 
                 // determine whether particle is inside this connection
                 bool inside = swc2v(nextpos, child, parent, dist2);
@@ -143,23 +148,29 @@ __global__ void volfrac(curandStatePhilox4_32_10_t *state, int3 Bounds, double4 
                 if (inside) {
                     // update the particles state
                     label[gid] = 1;
+                    // printf("It was inside\n");
                     // end for p loop
                     page = i_int3.z;
                 }
             }
         }
-        state[gid] = localstate; // Update the random state for the thread
     }
 
     __syncthreads(); // Correct synchronization function
 
     // sum the particles inside and calculate volume fraction
     if (gid == 0) {
-        int R = 0;
-        for (int i = 0; i < size; i++) {
-            R += label[i];
+        printf("gid %d\n", gid);
+        
+        double R = 0;
+        for (int i = 0; i < N; i++) {
+            R += (double)label[i];
         }
-        *vf = (double)R / (double)size; // Update the volume fraction using pointer
+        
+        printf("R: %.0f\n", R);
+        printf("R/N: %.0f/%d = %.4f\n", R, N, R / (double)N);
+        
+        vf[0] = (double)R / (double)N; // Update the volume fraction using pointers
     }
 }
 
@@ -246,6 +257,7 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
         curandStatePhilox4_32_10_t localstate = state[gid];
         xi = curand_uniform4_double(&localstate);
 
+        // prob to accept the sampling: init in: 4. per compartment. both <= to 1.  one should be 1 
         A = initPosition(gid, dx2, Bounds, state, SimulationParams, d4swc, nlut, NewIndex, IndexSize,
                          size, iter, init_in, debug, point); // initialize position inside cell
 
@@ -273,7 +285,12 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
             * @cases particle inside? 0 1 - check if updates
             * @cases particle inside? 1 0 - check if updates
             * @cases particle inside? 1 1 - update
+
+            * @vars: 
+            * t[0]: inside
+            * t[1]: outside
             */
+            
 
             // particle inside: [0 0] || [1 1]
             if (parstate.x == parstate.y) {
@@ -304,7 +321,7 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
                 } else {
                     A = nextpos;
                     parstate.x = parstate.y;
-                    t[0] = t[0] + tstep * 1 - fstep;
+                    t[0] = t[0] + tstep * (1 - fstep);
                     t[1] = t[1] + tstep * fstep;
                 }
             }
@@ -456,7 +473,8 @@ int main(int argc, char *argv[]) {
     double4 *u_D4Swc;
 
     //new
-    int *u_label; double *vf;
+    int *u_label; double *u_vf;
+    int n = 10000000;
 
     cudaMallocManaged(&u_dx2, 6 * iter * SOD);
     cudaMallocManaged(&u_dx4, 15 * iter * SOD);
@@ -477,13 +495,15 @@ int main(int argc, char *argv[]) {
     cudaMallocManaged(&u_NewIndex, newindexsize * SOI);
     cudaMallocManaged(&u_Flip, 3 * size * SOI);
     cudaMallocManaged(&u_D4Swc, nrow * SOD4);
+    cudaMallocManaged(&u_label, n*SOI);
+    cudaMallocManaged(&u_vf, SOD);
     //
     printf("Allocated Host Data\n");
 
     // Call Function to Set the Values for Host
     setup_data(u_dx2, u_dx4, u_SimP, u_D4Swc, u_NewLut, u_NewIndex, u_Flip,  simparam, swc_trim, mdx2, mdx4,
                u_AllData, u_Reflections,u_uref, u_T2, u_T, u_SigRe, u_Sig0, u_bvec, u_bval, u_TD,
-               lut, indexarr, bounds, size, iter, nrow, prod, newindexsize, sa_size, Nbvec, timepoints, NC);
+               lut, indexarr, bounds, size, iter, nrow, prod, newindexsize, sa_size, Nbvec, timepoints, NC, n, u_vf, u_label);
 
     // Create Random State Pointer Pointers
     curandStatePhilox4_32_10_t *deviceState;
@@ -523,17 +543,17 @@ int main(int argc, char *argv[]) {
     cudaMemPrefetchAsync(&u_D4Swc, nrow * SOD4, cudaCpuDeviceId);
 
     // new
-    cudaMemPrefetchAsync(&u_label, nrow * SOI, cudaCpuDeviceId);
-    cudaMemPrefetchAsync(&u_vf, nrow * SOD, cudaCpuDeviceId);
+    cudaMemPrefetchAsync(&u_label, n * SOI, cudaCpuDeviceId);
+    cudaMemPrefetchAsync(&u_vf, SOD, cudaCpuDeviceId);
 
     // determine the volume fraction
-    volfrac<<<grid, block>>>(state, Bounds, d4swc, nlut, NewIndex, IndexSize, n, u_label, u_vf);
+    volfrac<<<grid, block>>>(deviceState, u_Bounds, u_D4Swc, u_NewLut, u_NewIndex, u_IndexSize, n, u_label, u_vf);
     cudaEventRecord(stop_c);
     cudaDeviceSynchronize();
     cudaEventSynchronize(stop_c);
     cudaEventElapsedTime(&milliseconds, start_c, stop_c);
     printf("Volume Fraction Kernel took %f seconds\n", milliseconds / 1e3);
-    printf("Volume Fraction: %d\n", vf[0]);
+    printf("Volume Fraction: %f\n", u_vf[0]);
     printf("Freeing Device Data\n");
     // Free Device Memory
     gpuErrchk(cudaFree(u_label));
