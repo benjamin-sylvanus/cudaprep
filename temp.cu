@@ -34,32 +34,36 @@
 #define SOD4 (sizeof(double4))
 #define SOI3 (sizeof(int3))
 #define SOI4 (sizeof(int4))
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+#define gpuErrchk(ans)                        \
+    {                                         \
+        gpuAssert((ans), __FILE__, __LINE__); \
+    }
 
-using std::cout;
 using std::cin;
+using std::cout;
 using std::endl;
-using std::chrono::high_resolution_clock;
-using std::chrono::duration_cast;
 using std::chrono::duration;
+using std::chrono::duration_cast;
+using std::chrono::high_resolution_clock;
 using std::chrono::milliseconds;
 
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true)
 {
     if (code != cudaSuccess)
     {
-        fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-        if (abort) exit(code);
+        fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+        if (abort)
+            exit(code);
     }
 }
-
 
 /**
  * @brief Initializes the random number generator
  * @param state pointer to the random number generator
  * @param seed seed for the random number generator
  */
-__global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long seed) {
+__global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long seed)
+{
     int idx = threadIdx.x + blockDim.x * blockIdx.x;
     curand_init(seed, idx, 0, &state[idx]);
 }
@@ -76,13 +80,16 @@ __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long se
  * @param label
  * @param vf
  */
-__global__ void volfrac(curandStatePhilox4_32_10_t *state, int3 Bounds, double4 *d4swc, int *nlut, int *NewIndex, int3 IndexSize, int n, int *label, double *vf) {
+__global__ void volfrac(curandStatePhilox4_32_10_t *state, int3 Bounds, double4 *d4swc, int *nlut, int *NewIndex, int3 IndexSize, int n, int *label, double *vf)
+{
     int gid = threadIdx.x + blockDim.x * blockIdx.x;
-    int N=10000000;
-    if (gid==0) {
-            printf("ok %d\n",n);
+    int N = 10000000;
+    if (gid == 0)
+    {
+        printf("ok %d\n", n);
     }
-    if (gid < N) {
+    if (gid < N)
+    {
 
         label[gid] = 0;
         int R = 0;
@@ -128,24 +135,27 @@ __global__ void volfrac(curandStatePhilox4_32_10_t *state, int3 Bounds, double4 
         double dist2;
 
         // loop over connections
-        for (int page = 0; page < i_int3.z; page++) {
+        for (int page = 0; page < i_int3.z; page++)
+        {
             int3 c_new = make_int3(test_lutvalue, 0, page);
             int3 p_new = make_int3(test_lutvalue, 1, page);
             vindex.x = NewIndex[s2i(c_new, i_int3)] - 1;
             vindex.y = NewIndex[s2i(p_new, i_int3)] - 1;
             // if theres a index
-            if ((vindex.x) != -1) {
+            if ((vindex.x) != -1)
+            {
                 child = make_double4(d4swc[vindex.x].x, d4swc[vindex.x].y, d4swc[vindex.x].z, d4swc[vindex.x].w);
                 parent = make_double4(d4swc[vindex.y].x, d4swc[vindex.y].y, d4swc[vindex.y].z, d4swc[vindex.y].w);
 
-                //distance squared between child parent
+                // distance squared between child parent
                 dist2 = distance2(parent, child);
 
                 // determine whether particle is inside this connection
                 bool inside = swc2v(nextpos, child, parent, dist2);
 
                 // if it is inside the connection we don't need to check the remaining.
-                if (inside) {
+                if (inside)
+                {
                     // update the particles state
                     label[gid] = 1;
                     // printf("It was inside\n");
@@ -159,17 +169,19 @@ __global__ void volfrac(curandStatePhilox4_32_10_t *state, int3 Bounds, double4 
     __syncthreads(); // Correct synchronization function
 
     // sum the particles inside and calculate volume fraction
-    if (gid == 0) {
+    if (gid == 0)
+    {
         printf("gid %d\n", gid);
-        
+
         double R = 0;
-        for (int i = 0; i < N; i++) {
+        for (int i = 0; i < N; i++)
+        {
             R += (double)label[i];
         }
-        
+
         printf("R: %.0f\n", R);
         printf("R/N: %.0f/%d = %.4f\n", R, N, R / (double)N);
-        
+
         vf[0] = (double)R / (double)N; // Update the volume fraction using pointers
     }
 }
@@ -205,11 +217,13 @@ __global__ void volfrac(curandStatePhilox4_32_10_t *state, int3 Bounds, double4 
 __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds, curandStatePhilox4_32_10_t *state,
                          double *SimulationParams,
                          double4 *d4swc, int *nlut, int *NewIndex, int3 IndexSize, int size, int iter, bool debug,
-                         double3 point, int SaveAll, double * Reflections, double * Uref, int * flip,
-                         double * T2, double * T, double * Sig0, double * SigRe, double* BVec, double * BVal, double * TD) {
+                         double3 point, int SaveAll, double *Reflections, double *Uref, int *flip,
+                         double *T2, double *T, double *Sig0, double *SigRe, double *BVec, double *BVal, double *TD)
+{
 
     int gid = threadIdx.x + blockDim.x * blockIdx.x;
-    if (gid < size) {
+    if (gid < size)
+    {
         /**
             @index particle_num = SimulationParams[0]
             @index step_num = SimulationParams[1]
@@ -223,7 +237,7 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
         */
         double step_size = SimulationParams[2];
         double perm_prob = SimulationParams[3];
-        int init_in = (int) SimulationParams[4];
+        int init_in = (int)SimulationParams[4];
         double tstep = SimulationParams[8];
         double vsize = SimulationParams[9];
         double3 A;
@@ -234,7 +248,7 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
         int3 upper;
         int3 lower;
         int3 floorpos;
-        int Tstep=iter/timepoints;
+        int Tstep = iter / timepoints;
         double fstep = 1;
         double pi = PI;
 
@@ -257,7 +271,7 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
         curandStatePhilox4_32_10_t localstate = state[gid];
         xi = curand_uniform4_double(&localstate);
 
-        // prob to accept the sampling: init in: 4. per compartment. both <= to 1.  one should be 1 
+        // prob to accept the sampling: init in: 4. per compartment. both <= to 1.  one should be 1
         A = initPosition(gid, dx2, Bounds, state, SimulationParams, d4swc, nlut, NewIndex, IndexSize,
                          size, iter, init_in, debug, point); // initialize position inside cell
 
@@ -266,17 +280,18 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
 
         parstate = make_int2(1, 1); // particle state [previous step, current step]
         int parlut = 1;             // particle within bounds of LUT?
-        double t[Nc] ={0};          // add tstep for step in compartment
+        double t[Nc] = {0};         // add tstep for step in compartment
 
-        for (int i = 0; i < iter; i++) {
-            xi = curand_uniform4_double(&localstate);   // generate uniform randoms for step
-            completes = xi.w < perm_prob;               // determine if step executes
-            computeNext(A, step, xi, nextpos, pi);      // compute the next position
+        for (int i = 0; i < iter; i++)
+        {
+            xi = curand_uniform4_double(&localstate); // generate uniform randoms for step
+            completes = xi.w < perm_prob;             // determine if step executes
+            computeNext(A, step, xi, nextpos, pi);    // compute the next position
 
             // check coordinate validity
             validCoord(nextpos, A, b_int3, upper, lower, floorpos, Reflections, Uref, gid, i, size, iter, flip);
-            floorpos = make_int3((int) nextpos.x, (int) nextpos.y, (int) nextpos.z);
-            int test_lutvalue = nlut[s2i(floorpos,b_int3)];
+            floorpos = make_int3((int)nextpos.x, (int)nextpos.y, (int)nextpos.z);
+            int test_lutvalue = nlut[s2i(floorpos, b_int3)];
             bool inside = checkConnections(i_int3, test_lutvalue, nextpos, NewIndex, d4swc, fstep); // check if particle inside
             parstate.y = (inside) ? 1 : 0;
 
@@ -286,27 +301,34 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
             * @cases particle inside? 1 0 - check if updates
             * @cases particle inside? 1 1 - update
 
-            * @vars: 
+            * @vars:
             * t[0]: inside
             * t[1]: outside
             */
-            
 
             // particle inside: [0 0] || [1 1]
-            if (parstate.x == parstate.y) {
+            if (parstate.x == parstate.y)
+            {
                 A = nextpos;
-                if (parstate.x) {
+                if (parstate.x)
+                {
                     t[0] = t[0] + tstep;
-                } else {
+                }
+                else
+                {
                     t[1] = t[1] + tstep;
                 }
             }
 
             // particle inside: [1 0]
-            if (parstate.x && !parstate.y) {
-                if (!completes) {
+            if (parstate.x && !parstate.y)
+            {
+                if (!completes)
+                {
                     t[0] = t[0] + tstep;
-                } else {
+                }
+                else
+                {
                     A = nextpos;
                     parstate.x = parstate.y;
                     t[0] = t[0] + tstep * fstep;
@@ -315,10 +337,14 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
             }
 
             // particle inside [0 1]
-            if (!parstate.x && parstate.y) {
-                if (!completes) {
+            if (!parstate.x && parstate.y)
+            {
+                if (!completes)
+                {
                     t[1] = t[1] + tstep;
-                } else {
+                }
+                else
+                {
                     A = nextpos;
                     parstate.x = parstate.y;
                     t[0] = t[0] + tstep * (1 - fstep);
@@ -327,7 +353,8 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
             }
 
             // Store Position Data
-            if (SaveAll) {
+            if (SaveAll)
+            {
                 int3 dix = make_int3(size, iter, 3);
                 int3 did[4];
                 did[0] = make_int3(gid, i, 0);
@@ -340,28 +367,27 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
             {
                 diffusionTensor(&A, &xnot, vsize, dx2, dx4, &d2, i, gid, iter, size);
                 // https://github.com/NYU-DiffusionMRI/monte-carlo-simulation-3D-RMS/blob/master/part1_demo3_simulation.m
-
             }
 
             // Store Signal Data
             {
-                if (i%Tstep == 0)
+                if (i % Tstep == 0)
                 {
-                    int tidx=i/Tstep;
+                    int tidx = i / Tstep;
                     // loop over compartments
                     double s0 = 0.0;
-                    for (int j = 0; j < 2; j++) {
+                    for (int j = 0; j < 2; j++)
+                    {
                         /**
-                            * @var s0 is our summation variable
-                            * @var t[j] is the time in compartment j
-                            * @var T2 is the T2 Relaxation in Compartment j
-                        */
-                        s0 = s0 + (double) (t[j] / _T2[j]); // TODO implement "t" as time in each compartment
-
+                         * @var s0 is our summation variable
+                         * @var t[j] is the time in compartment j
+                         * @var T2 is the T2 Relaxation in Compartment j
+                         */
+                        s0 = s0 + (double)(t[j] / _T2[j]); // TODO implement "t" as time in each compartment
                     }
 
                     s0 = exp(-1.0 * s0);
-                    atomicAdd(&Sig0[tidx],s0);
+                    atomicAdd(&Sig0[tidx], s0);
 
                     // // Signal
                     // for(int j = 0; j < Nbvec; j++)
@@ -376,7 +402,7 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
 
                     for (int j = 0; j < Nc; j++)
                     {
-                        t[j]= 0;
+                        t[j] = 0;
                     }
                 }
             }
@@ -384,7 +410,8 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
     }
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     cudaEvent_t start_c, stop_c;
     cudaEventCreate(&start_c);
     cudaEventCreate(&stop_c);
@@ -398,7 +425,8 @@ int main(int argc, char *argv[]) {
      * Read Simulation and Initialize Object
      */
     // Parse Arguments
-    if (argc < 2) {
+    if (argc < 2)
+    {
         path = "/autofs/space/symphony_002/users/BenSylvanus/cuda/Sims";
         std::string InPath = path;
         std::string OutPath = path;
@@ -406,7 +434,9 @@ int main(int argc, char *argv[]) {
         OutPath.append("/results");
         control.Setup(InPath, OutPath, 0);
         control.start();
-    } else {
+    }
+    else
+    {
         control.Setup(argc, argv, 1);
     }
     system("clear");
@@ -422,7 +452,8 @@ int main(int argc, char *argv[]) {
     int sa_size = (SaveAll) ? size * iter : 1;
     int NC = 2;
 
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 10; i++)
+    {
         double value = simulationparams[i];
         simparam[i] = value;
     }
@@ -431,49 +462,54 @@ int main(int argc, char *argv[]) {
     dim3 block(block_size);
     dim3 grid((size / block.x) + 1);
 
-    std::vector <uint64_t> bounds = sim.getbounds();
-    int boundx = (int) bounds[0]; int boundy = (int) bounds[1]; int boundz = (int) bounds[2];
-    int prod = (int) (boundx * boundy * boundz);
+    std::vector<uint64_t> bounds = sim.getbounds();
+    int boundx = (int)bounds[0];
+    int boundy = (int)bounds[1];
+    int boundz = (int)bounds[2];
+    int prod = (int)(boundx * boundy * boundz);
     std::vector<double> r_swc = sim.getSwc();
     int nrow = r_swc.size() / 6;
 
     double4 swc_trim[nrow];
     double w_swc[nrow * 4];
-    for (int i = 0; i < nrow; i++) {
+    for (int i = 0; i < nrow; i++)
+    {
         swc_trim[i].x = r_swc[i + nrow * 1];
         swc_trim[i].y = r_swc[i + nrow * 2];
         swc_trim[i].z = r_swc[i + nrow * 3];
         swc_trim[i].w = r_swc[i + nrow * 4];
     }
-    for (int i = 0; i < nrow; i++) {
+    for (int i = 0; i < nrow; i++)
+    {
         w_swc[4 * i + 0] = r_swc[i + nrow * 1];
         w_swc[4 * i + 1] = r_swc[i + nrow * 2];
         w_swc[4 * i + 2] = r_swc[i + nrow * 3];
         w_swc[4 * i + 3] = r_swc[i + nrow * 4];
     }
 
-    std::vector <uint64_t> lut = sim.getLut();
-    std::vector <uint64_t> indexarr = sim.getIndex();
-    std::vector <std::vector<uint64_t>> arrdims = sim.getArraydims();
-    std::vector <uint64_t> swc_dims = arrdims[0];
-    std::vector <uint64_t> lut_dims = arrdims[1];
-    std::vector <uint64_t> index_dims = arrdims[2];
-    std::vector <uint64_t> pairs_dims = arrdims[3];
-    std::vector <uint64_t> bounds_dims = arrdims[4];
+    std::vector<uint64_t> lut = sim.getLut();
+    std::vector<uint64_t> indexarr = sim.getIndex();
+    std::vector<std::vector<uint64_t>> arrdims = sim.getArraydims();
+    std::vector<uint64_t> swc_dims = arrdims[0];
+    std::vector<uint64_t> lut_dims = arrdims[1];
+    std::vector<uint64_t> index_dims = arrdims[2];
+    std::vector<uint64_t> pairs_dims = arrdims[3];
+    std::vector<uint64_t> bounds_dims = arrdims[4];
     int newindexsize = index_dims[0] * index_dims[1] * index_dims[2];
 
-    ///Unified Memory
+    /// Unified Memory
 
     // Declare Unified Memory Pointers
 
     double *u_dx2, *u_dx4, *u_SimP, *u_T2, *u_T, *u_SigRe, *u_Sig0, *u_bvec,
-            *u_bval, *u_TD, *mdx2, *mdx4, *u_AllData, *u_Reflections, *u_uref;
+        *u_bval, *u_TD, *mdx2, *mdx4, *u_AllData, *u_Reflections, *u_uref;
 
     int *u_NewLut, *u_NewIndex, *u_Flip;
     double4 *u_D4Swc;
 
-    //new
-    int *u_label; double *u_vf;
+    // new
+    int *u_label;
+    double *u_vf;
     int n = 10000000;
 
     cudaMallocManaged(&u_dx2, 6 * iter * SOD);
@@ -495,14 +531,14 @@ int main(int argc, char *argv[]) {
     cudaMallocManaged(&u_NewIndex, newindexsize * SOI);
     cudaMallocManaged(&u_Flip, 3 * size * SOI);
     cudaMallocManaged(&u_D4Swc, nrow * SOD4);
-    cudaMallocManaged(&u_label, n*SOI);
+    cudaMallocManaged(&u_label, n * SOI);
     cudaMallocManaged(&u_vf, SOD);
     //
     printf("Allocated Host Data\n");
 
     // Call Function to Set the Values for Host
-    setup_data(u_dx2, u_dx4, u_SimP, u_D4Swc, u_NewLut, u_NewIndex, u_Flip,  simparam, swc_trim, mdx2, mdx4,
-               u_AllData, u_Reflections,u_uref, u_T2, u_T, u_SigRe, u_Sig0, u_bvec, u_bval, u_TD,
+    setup_data(u_dx2, u_dx4, u_SimP, u_D4Swc, u_NewLut, u_NewIndex, u_Flip, simparam, swc_trim, mdx2, mdx4,
+               u_AllData, u_Reflections, u_uref, u_T2, u_T, u_SigRe, u_Sig0, u_bvec, u_bval, u_TD,
                lut, indexarr, bounds, size, iter, nrow, prod, newindexsize, sa_size, Nbvec, timepoints, NC, n, u_vf, u_label);
 
     // Create Random State Pointer Pointers
@@ -510,7 +546,7 @@ int main(int argc, char *argv[]) {
 
     cudaEventRecord(start_c);
     // Allocate Memory on Device
-    gpuErrchk(cudaMalloc((curandStatePhilox4_32_10_t * *) & deviceState, size * sizeof(curandStatePhilox4_32_10_t)));
+    gpuErrchk(cudaMalloc((curandStatePhilox4_32_10_t **)&deviceState, size * sizeof(curandStatePhilox4_32_10_t)));
 
     // Set Values for Device
     setup_kernel<<<grid, block>>>(deviceState, 1); // initialize the random states
@@ -561,16 +597,15 @@ int main(int argc, char *argv[]) {
 
     /**
      * Call Kernel
-    */
+     */
     {
         printf("Simulating...\n");
         simulate<<<grid, block>>>(u_AllData, u_dx2, u_dx4, u_Bounds, deviceState, u_SimP,
                                   u_D4Swc, u_NewLut, u_NewIndex, u_IndexSize, size,
-                                  iter, debug, point,SaveAll, u_Reflections, u_uref, u_Flip,
+                                  iter, debug, point, SaveAll, u_Reflections, u_uref, u_Flip,
                                   u_T2, u_T, u_Sig0, u_SigRe, u_bvec, u_bval, u_TD);
         cudaEventRecord(stop_c);
     }
-
 
     // Wait for results
     cudaDeviceSynchronize();
@@ -589,8 +624,7 @@ int main(int argc, char *argv[]) {
     // Write Results
     {
         std::string outpath = sim.getResultPath();
-        writeResults(w_swc, u_SimP, u_dx2, mdx2, u_dx4, mdx4, u_T, u_Reflections,  u_uref,  u_Sig0, u_SigRe, u_AllData, iter, size, nrow, timepoints, Nbvec, sa_size, SaveAll,outpath);
-
+        writeResults(w_swc, u_SimP, u_dx2, mdx2, u_dx4, mdx4, u_T, u_Reflections, u_uref, u_Sig0, u_SigRe, u_AllData, iter, size, nrow, timepoints, Nbvec, sa_size, SaveAll, outpath);
     }
 
     auto t2 = high_resolution_clock::now();
@@ -622,7 +656,6 @@ int main(int argc, char *argv[]) {
         gpuErrchk(cudaFree(u_bval));
         gpuErrchk(cudaFree(u_TD));
         gpuErrchk(cudaFree(deviceState));
-
     }
 
     printf("Done!\n");
