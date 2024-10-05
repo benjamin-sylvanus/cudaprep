@@ -157,7 +157,8 @@ __global__ void volfrac(curandStatePhilox4_32_10_t *state, int3 Bounds, double4 
     }
 
     __syncthreads(); // Correct synchronization function
-
+    // com and create vectors from points to com. Then save as NX3  
+    https://github.com/NYU-DiffusionMRI/RaW-seg/blob/master/lib/analyzeseg.m
     // sum the particles inside and calculate volume fraction
     if (gid == 0) {
         printf("gid %d\n", gid);
@@ -343,41 +344,62 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
 
             }
 
+
+
+            // // Diffusion Signal Narrow Pulse Limit (this will always be saved)
+            // // Acording to Rafael Patiño:
+            // // \delta Phase = a(t)*gamma*g(t)*z(t)*(\delta t)
+            // // Phase        = \sum_i \delta Phase_i
+            // // Signal       = \sum_i e^{ i * Phase _i}
+            // // Signal_{re}  = \sum_i cos( Phase_i )
+            // for(int j = 0; j < Ngrad; j++) { // bvalue = t*q^2 => q = sqrt( bvalue/t )
+            //     qx = sqrt( Bval[j] / TD[tidx] ) * (dx*Bvec[j*3] + dy*Bvec[j*3+1] + dz*Bvec[j*3+2]);
+            //     atomAdd(&SigRe[Ngrad*tidx+j] , s0*cos(qx));
+            //     // atomAdd(&sigIm[Ngrad*tidx+j],-s0*sin(qx));
+            //     } // j
+
+            // } // if Tstep (save state)
+            
             // Store Signal Data
             {
+                    // if inside inner, contribute to signal
                 if (i%Tstep == 0)
                 {
                     int tidx=i/Tstep;
-                    // loop over compartments
+                
+                     /**
+                        * @var s0 is our summation variable
+                        * @var t[j] is the time in compartment j
+                        * @var T2 is the T2 Relaxation in Compartment j
+                    */
                     double s0 = 0.0;
-                    for (int j = 0; j < 2; j++) {
-                        /**
-                            * @var s0 is our summation variable
-                            * @var t[j] is the time in compartment j
-                            * @var T2 is the T2 Relaxation in Compartment j
-                        */
+                    for (int j = 0; j < Nc; j++) {
                         s0 = s0 + (double) (t[j] / _T2[j]); // TODO implement "t" as time in each compartment
-
                     }
 
-                    s0 = exp(-1.0 * s0);
+                    s0 = exp(-1.0 * s0); // if inside inner box calc otherwise don't
                     atomicAdd(&Sig0[tidx],s0);
 
-                    // // Signal
-                    // for(int j = 0; j < Nbvec; j++)
-                    // {
-                    //     // access b value and b vector
-                    //     double bval = bvalues[j];
-                    //     double3 bvec =  bvectors[j];
-                    //     td = TD[tidx];
-                    //     qx = sqrt(b.w/td) * dot(d2,bvec)
-                    //     atomicAdd(&sigRe[Nbvec * tidx + j], s0 * cos(qx));
-                    // }
+
+
+                    // Signal
+                    for(int j = 0; j < Nbvec; j++)
+                    {
+                        
+                        double td = TD[tidx];
+                        double qx = sqrt( BVal[j] / TD[tidx] ) * (d2.x*BVec[j*3] + d2.y*BVec[j*3+1] + d2.z*BVec[j*3+2]);
+                        if (gid < 5 && tidx < 10 && tidx > 1) { 
+                            printf("TD[tidx]: %f BVal[j] %f BVec[j] %f s0: %f qx %f  \n",TD[tidx],BVal[j],BVec[j], s0, qx); 
+                        }
+                        atomicAdd(&SigRe[Nbvec * tidx + j], s0 * cos(qx)); // sum over all particles
+                    }
+
 
                     for (int j = 0; j < Nc; j++)
                     {
                         t[j]= 0;
                     }
+
                 }
             }
         }

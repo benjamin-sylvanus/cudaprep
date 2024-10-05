@@ -478,8 +478,8 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
         // double3 intersection = intersectionPoint;
         nextpos = intersectionPoint + reflectionVector;
 
-        printf("NextPos: %f %f %f -> %f %f %f\n", nextpos.x, nextpos.y, nextpos.z, intersectionPoint.x+reflectionVector.x, intersectionPoint.y + reflectionVector.y, intersectionPoint.z + reflectionVector.z);
-        printf("Count: %d\n", count);
+        // printf("NextPos: %f %f %f -> %f %f %f\n", nextpos.x, nextpos.y, nextpos.z, intersectionPoint.x+reflectionVector.x, intersectionPoint.y + reflectionVector.y, intersectionPoint.z + reflectionVector.z);
+        // printf("Count: %d\n", count);
         count += 1;
 
         // store the intersection point and unreflected position
