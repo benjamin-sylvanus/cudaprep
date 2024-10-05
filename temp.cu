@@ -44,7 +44,9 @@ using std::chrono::duration_cast;
 using std::chrono::duration;
 using std::chrono::milliseconds;
 
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+__device__ int progressCounter = 0.0;
+
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true)
 {
     if (code != cudaSuccess)
     {
@@ -402,6 +404,15 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
 
                 }
             }
+        }
+        int totalParticles = (int) SimulationParams[0];
+        int progress= atomicAdd(&progressCounter, 1);
+        int printInterval = totalParticles / 20;  // 5%
+        if (printInterval > 0 && progress % printInterval == 0)
+        {
+            printf("Progress %d/%d (%2.0f%%)\n", 
+                progress, totalParticles, 
+                ((float)progress / (float)totalParticles) * 100.0f);
         }
     }
 }
