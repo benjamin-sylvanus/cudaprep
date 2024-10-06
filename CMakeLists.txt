@@ -24,8 +24,7 @@ find_library(CUBLAS_LIBRARY cublas HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib64)
 find_library(CURAND_LIBRARY curand HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib64)
 find_library(CUSPARSE_LIBRARY cusparse HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib64)
 
-include_directories(${CMAKE_SOURCE_DIR})
-
+include_directories(${CMAKE_SOURCE_DIR}/src)
 
 set(SOURCES
    ${CMAKE_SOURCE_DIR}/src/datatemplate.cpp
@@ -35,6 +34,7 @@ set(SOURCES
    ${CMAKE_SOURCE_DIR}/src/viewer.cpp
    ${CMAKE_SOURCE_DIR}/src/funcs.cpp
    ${CMAKE_SOURCE_DIR}/src/overloads.cpp
+   ${CMAKE_SOURCE_DIR}/main.cpp  # Add this line to include main.cpp
 )
 
 set(OBJECTS "")
@@ -51,19 +51,19 @@ foreach(SRC_FILE ${SOURCES})
 endforeach()
 
 add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/bin/main.o
-    COMMAND ${CUDA_NVCC_EXECUTABLE}
-    ARGS -arch=sm_75 -ccbin ${CMAKE_CXX_COMPILER} -dc -L${CUDA_TOOLKIT_ROOT_DIR}/lib64 ${CMAKE_SOURCE_DIR}/temp.cu -o ${CMAKE_CURRENT_BINARY_DIR}/bin/main.o
-    DEPENDS ${CMAKE_SOURCE_DIR}/temp.cu
-)
-
-add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/bin/gpuCode.o
     COMMAND ${CUDA_NVCC_EXECUTABLE}
-    ARGS -arch=sm_75 -dlink ${OBJECTS} ${CMAKE_CURRENT_BINARY_DIR}/bin/main.o -o ${CMAKE_CURRENT_BINARY_DIR}/bin/gpuCode.o
-    DEPENDS ${OBJECTS} ${CMAKE_CURRENT_BINARY_DIR}/bin/main.o
+    ARGS -arch=sm_75 -dlink ${OBJECTS} -o ${CMAKE_CURRENT_BINARY_DIR}/bin/gpuCode.o
+    DEPENDS ${OBJECTS}
 )
 
-add_executable(app ${CMAKE_CURRENT_BINARY_DIR}/bin/main.o ${CMAKE_CURRENT_BINARY_DIR}/bin/gpuCode.o ${OBJECTS})
+add_executable(app ${OBJECTS} ${CMAKE_CURRENT_BINARY_DIR}/bin/gpuCode.o)
 set_target_properties(app PROPERTIES LINKER_LANGUAGE CUDA)
-target_link_libraries(app ${CUBLAS_LIBRARY} ${CURAND_LIBRARY} ${CUSPARSE_LIBRARY} ${CUDA_LIBRARIES} nlohmann_json::nlohmann_json)
+target_link_libraries(app 
+    ${CUBLAS_LIBRARY} 
+    ${CURAND_LIBRARY} 
+    ${CUSPARSE_LIBRARY} 
+    ${CUDA_LIBRARIES} 
+    nlohmann_json::nlohmann_json 
+    demo_creator  # Add this line to link demo_creator
+)
