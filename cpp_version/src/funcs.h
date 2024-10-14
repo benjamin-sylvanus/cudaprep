@@ -50,4 +50,9 @@ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos, const int
 
 void diffusionTensor(double3 *A, double3 *xnot, double vsize, double *dx2, double *dx4, double3 *d2, int i, int gid, int iter, int size);
 double dot(double3 a, double3 b);
+
+void logSimulationResults(const std::vector<double>& savedata, const std::vector<double>& dx2, 
+                          const std::vector<double>& dx4, const std::vector<double>& Sig0, 
+                          const std::vector<double>& SigRe);
+
 #endif // FUNCS_H
