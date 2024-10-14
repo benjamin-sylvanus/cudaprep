@@ -23,6 +23,9 @@ double3 operator-(const double &lhs, const double3 &rhs);
 double3 operator-=(double3 &lhs, const double3 &rhs);
 double3 operator-=(double3 &lhs, const double &rhs);
 
+
+
+
 void set(double * lhs, int3 &index, double3 &rhs);
 // Add other operator overloads as needed
 

@@ -3,9 +3,11 @@
 #include <vector>
 #include <chrono>
 #include <random>
+#include <thread>
 #include "newsimreader.h"
 #include "cpu_kernels.h"
 #include "cuda_replacements.h"
+#include "funcs.h"
 
 int main() {
     std::chrono::high_resolution_clock::time_point start_c, stop_c;
@@ -16,7 +18,8 @@ int main() {
     const std::string jsonFile = "/Users/benjaminsylvanus/Documents/mgh/json-writer/simulation_configs/853035674/simulation_config.json";
     
     // Add a debug flag
-    bool debug = false;
+    bool debug;
+    debug = false;
     try {
 
         // Create a NewSimReader instance
@@ -44,9 +47,9 @@ int main() {
         NewSimReader::previewConfig(variables, particleNum, stepNum, stepSize, permProb, initIn, D0, d, scale, tstep, vsize,
                                   swcmat, LUT, C, pairs, boundSize, true);
         // Set up simulation parameters
-        int size = std::min(static_cast<int>(particleNum), 10000);  // Limit to 10000 particles
-        int iter = std::min(static_cast<int>(stepNum), 10000);       // Limit to 10000 iterations
-        int SaveAll = 1; // Assuming we want to save all data
+        int size =  50000;
+        int iter =  10000;
+        int SaveAll = 0; // Assuming we want to save all data
         int3 Bounds = make_int3(boundSize[0], boundSize[1], boundSize[2]);
         
         // Allocate memory for simulation data
@@ -66,7 +69,6 @@ int main() {
 
         // Set up random number generator
         std::random_device rd;
-        std::mt19937 gen(rd());
 
         // Determine nrow from swcmat
         size_t nrow = 0;
@@ -110,8 +112,8 @@ int main() {
             std::cout << "Bounds: " << Bounds.x << ", " << Bounds.y << ", " << Bounds.z << std::endl;
         }
 
-        // Perform simulation
-        std::vector<double> SimulationParams = {
+        // After extracting data from variables
+        std::vector SimulationParams = {
             static_cast<double>(size),  // particle_num
             static_cast<double>(iter),  // step_num
             stepSize,
@@ -123,70 +125,66 @@ int main() {
             tstep,
             vsize
         };
-        debug = true;
-        if (debug) {
-            std::cout << "Debug: SimulationParams size: " << SimulationParams.size() << std::endl;
-            for (size_t i = 0; i < SimulationParams.size(); ++i) {
-                std::cout << "SimulationParams[" << i << "]: " << SimulationParams[i] << std::endl;
-            }
-            std::cout << "Debug: swcmat_vec size: " << swcmat_vec.size() << std::endl;
-            std::cout << "Debug: LUT_vec size: " << LUT_vec.size() << std::endl;
-            std::cout << "Debug: C_vec size: " << C_vec.size() << std::endl;
-            std::cout << "Debug: Calling simulate_cpu..." << std::endl;
-        }
-        debug = false;
 
+        // Debug output
+        if (debug) {
+            std::cout << "Debug: SimulationParams:" << std::endl;
+            for (size_t i = 0; i < SimulationParams.size(); ++i) {
+                std::cout << "  [" << i << "]: " << SimulationParams[i] << std::endl;
+            }
+        }
+        // Reset other data structures as needed
+        unsigned int num_threads = std::thread::hardware_concurrency() / 4;
+
+        // Perform simulation with 4 thread
+        std::cout << "Running simulation with " << num_threads << " threads..." << std::endl;
+        start_c = std::chrono::high_resolution_clock::now();
         simulate_cpu(savedata, dx2, dx4, Bounds, SimulationParams,
                      swcmat_vec, LUT_vec, C_vec, 
                      make_int3(C[0], C[1], C[2]), size, iter, debug, 
                      make_double3(swcmat[0], swcmat[1], swcmat[2]), SaveAll, 
-                     Reflections, Uref, flip, T2, T, Sig0, SigRe, BVec, BVal, TD);
-
-        if (debug) std::cout << "Debug: simulate_cpu completed." << std::endl;
+                     Reflections, Uref, flip, T2, T, Sig0, SigRe, BVec, BVal, TD, num_threads);
 
         stop_c = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop_c - start_c);
+        std::cout << "Simulation took " << duration.count() / 1000.0 << " seconds" << std::endl;
+        debug=true;
+        if (debug) {
+            logSimulationResults(savedata, dx2, dx4, Sig0, SigRe);
+        }
+        debug=false;
+        // Reset Sig0 and other relevant data structures
+        std::fill(Sig0.begin(), Sig0.end(), 0.0);
+        std::fill(dx2.begin(), dx2.end(), 0.0);
+        std::fill(dx4.begin(), dx4.end(), 0.0);
+        std::fill(Reflections.begin(), Reflections.end(), 0.0);
+        std::fill(Uref.begin(), Uref.end(), 0.0);
+        std::fill(flip.begin(), flip.end(), 0);
+        std::fill(T2.begin(), T2.end(), 0.0);
+        std::fill(T.begin(), T.end(), 0.0);
+        std::fill(SigRe.begin(), SigRe.end(), 0.0);
+        std::fill(BVec.begin(), BVec.end(), 0.0);
+        std::fill(BVal.begin(), BVal.end(), 0.0);
+        std::fill(TD.begin(), TD.end(), 0.0);
+        // Reset other data structures as needed
+        num_threads = std::max(static_cast<int>(std::thread::hardware_concurrency() / 2), 12);
+        // Perform simulation with 10 threads
+        std::cout << "Running simulation with " << num_threads << " threads..." << std::endl;
+        start_c = std::chrono::high_resolution_clock::now();
+        simulate_cpu(savedata, dx2, dx4, Bounds, SimulationParams,
+                     swcmat_vec, LUT_vec, C_vec, 
+                     make_int3(C[0], C[1], C[2]), size, iter, debug, 
+                     make_double3(swcmat[0], swcmat[1], swcmat[2]), SaveAll, 
+                     Reflections, Uref, flip, T2, T, Sig0, SigRe, BVec, BVal, TD, num_threads);
+
+        stop_c = std::chrono::high_resolution_clock::now();
+        duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop_c - start_c);
         std::cout << "Simulation took " << duration.count() / 1000.0 << " seconds" << std::endl;
 
         debug=true;
         // Debug output after simulation
         if (debug) {
-            std::cout << "Debug: Checking results..." << std::endl;
-            std::cout << "savedata size: " << savedata.size() << std::endl;
-            std::cout << "dx2 size: " << dx2.size() << std::endl;
-            std::cout << "dx4 size: " << dx4.size() << std::endl;
-            std::cout << "Sig0 size: " << Sig0.size() << std::endl;
-            std::cout << "SigRe size: " << SigRe.size() << std::endl;
-            // Preview of dx2, Sig0, and SigRe (first 10 non-zero entries)
-            std::cout << "dx2: ";
-            int count = 0;
-            for (size_t i = 0; count < 10 && i < dx2.size(); ++i) {
-                if (dx2[i] != 0) {
-                    std::cout << dx2[i] << " ";
-                    ++count;
-                }
-            }
-            std::cout << std::endl;
-
-            std::cout << "Sig0: ";
-            count = 0;
-            for (size_t i = 0; count < 10 && i < Sig0.size(); ++i) {
-                if (Sig0[i] != 0) {
-                    std::cout << Sig0[i] << " ";
-                    ++count;
-                }
-            }
-            std::cout << std::endl;
-
-            std::cout << "SigRe: ";
-            count = 0;
-            for (size_t i = 0; count < 10 && i < SigRe.size(); ++i) {
-                if (SigRe[i] != 0) {
-                    std::cout << SigRe[i] << " ";
-                    ++count;
-                }
-            }
-            std::cout << std::endl;
+            logSimulationResults(savedata, dx2, dx4, Sig0, SigRe);
         }
 
 
