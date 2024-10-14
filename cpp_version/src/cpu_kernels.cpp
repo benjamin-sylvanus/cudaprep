@@ -7,6 +7,9 @@
 #include <numeric>
 #include <iostream>
 #include "overloads.h"
+#include <thread>
+#include <mutex>
+#include <chrono>
 
 // Constants
 const double PI = 3.14159265358979323846;
@@ -52,20 +55,17 @@ void volfrac_cpu(const std::vector<double4>& d4swc, const std::vector<int>& nlut
     if (debug) std::cout << "Debug: Volume fraction calculated: " << vf << std::endl;
 }
 
-void simulate_cpu(std::vector<double>& savedata, std::vector<double>& dx2, std::vector<double>& dx4, 
-                  int3 Bounds, const std::vector<double>& SimulationParams, const std::vector<double4>& d4swc, 
-                  const std::vector<int>& nlut, const std::vector<int>& NewIndex, int3 IndexSize, int size, int iter, 
-                  bool debug, double3 point, int SaveAll, std::vector<double>& Reflections, 
-                  std::vector<double>& Uref, std::vector<int>& flip, const std::vector<double>& T2, 
-                  std::vector<double>& T, std::vector<double>& Sig0, std::vector<double>& SigRe, 
-                  const std::vector<double>& BVec, const std::vector<double>& BVal, const std::vector<double>& TD) {
-    if (debug) std::cout << "Debug: Entering simulate_cpu function" << std::endl;
-    
+void simulate_cpu_thread(int start, int end, std::vector<double>& savedata, std::vector<double>& dx2, std::vector<double>& dx4, 
+                         int3 Bounds, const std::vector<double>& SimulationParams, const std::vector<double4>& d4swc, 
+                         const std::vector<int>& nlut, const std::vector<int>& NewIndex, int3 IndexSize, int size, int iter, 
+                         bool debug, double3 point, int SaveAll, std::vector<double>& Reflections, 
+                         std::vector<double>& Uref, std::vector<int>& flip, const std::vector<double>& T2, 
+                         std::vector<double>& T, std::vector<double>& Sig0, std::vector<double>& SigRe, 
+                         const std::vector<double>& BVec, const std::vector<double>& BVal, const std::vector<double>& TD,
+                         std::mutex& sig0_mutex) {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<> dis(0.0, 1.0);
-
-    if (debug) std::cout << "Debug: Random number generator set up" << std::endl;
 
     double step_size = SimulationParams[2];
     double perm_prob = SimulationParams[3];
@@ -75,9 +75,7 @@ void simulate_cpu(std::vector<double>& savedata, std::vector<double>& dx2, std::
     int Tstep = iter / timepoints;
     double fstep = 1;
 
-    if (debug) std::cout << "Debug: Simulation parameters extracted" << std::endl;
-
-    for (int gid = 0; gid < size; ++gid) {
+    for (int gid = start; gid < end; ++gid) {
         if (debug) std::cout << "Debug: Starting simulation for particle " << gid << std::endl;
 
         double3 A = initPosition(gid, dx2.data(), Bounds, gen,
@@ -157,7 +155,11 @@ void simulate_cpu(std::vector<double>& savedata, std::vector<double>& dx2, std::
                     s0 += t[j] / T2[j];
                 }
                 s0 = std::exp(-s0);
-                Sig0[tidx] += s0;
+                
+                {
+                    std::lock_guard<std::mutex> lock(sig0_mutex);
+                    Sig0[tidx] += s0;
+                }
 
                 for (int j = 0; j < 2; j++) {
                     t[j] = 0;
@@ -167,6 +169,46 @@ void simulate_cpu(std::vector<double>& savedata, std::vector<double>& dx2, std::
 
         if (debug) std::cout << "Debug: Simulation completed for particle " << gid << std::endl;
     }
+}
 
-    if (debug) std::cout << "Debug: Exiting simulate_cpu function" << std::endl;
+void simulate_cpu(std::vector<double>& savedata, std::vector<double>& dx2, std::vector<double>& dx4, 
+                  int3 Bounds, const std::vector<double>& SimulationParams, const std::vector<double4>& d4swc, 
+                  const std::vector<int>& nlut, const std::vector<int>& NewIndex, int3 IndexSize, int size, int iter, 
+                  bool debug, double3 point, int SaveAll, std::vector<double>& Reflections, 
+                  std::vector<double>& Uref, std::vector<int>& flip, const std::vector<double>& T2, 
+                  std::vector<double>& T, std::vector<double>& Sig0, std::vector<double>& SigRe, 
+                  const std::vector<double>& BVec, const std::vector<double>& BVal, const std::vector<double>& TD,
+                  int num_threads) {
+    if (debug) std::cout << "Debug: Entering simulate_cpu function with " << num_threads << " threads" << std::endl;
+
+    std::vector<std::thread> threads;
+    std::mutex sig0_mutex;
+
+    int particles_per_thread = size / num_threads;
+    int remaining_particles = size % num_threads;
+
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    int start = 0;
+    for (int i = 0; i < num_threads; ++i) {
+        int end = start + particles_per_thread + (i < remaining_particles ? 1 : 0);
+        threads.emplace_back(simulate_cpu_thread, start, end, std::ref(savedata), std::ref(dx2), std::ref(dx4),
+                             Bounds, std::ref(SimulationParams), std::ref(d4swc), std::ref(nlut), std::ref(NewIndex),
+                             IndexSize, size, iter, debug, point, SaveAll, std::ref(Reflections), std::ref(Uref),
+                             std::ref(flip), std::ref(T2), std::ref(T), std::ref(Sig0), std::ref(SigRe),
+                             std::ref(BVec), std::ref(BVal), std::ref(TD), std::ref(sig0_mutex));
+        start = end;
+    }
+
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+
+    if (debug) {
+        std::cout << "Debug: Exiting simulate_cpu function" << std::endl;
+        std::cout << "Simulation with " << num_threads << " threads took " << duration.count() / 1000.0 << " seconds" << std::endl;
+    }
 }

@@ -365,3 +365,47 @@ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &upper, int3 
 double dot(double3 a, double3 b) {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
+
+// Add this function at the end of the file
+
+void logSimulationResults(const std::vector<double>& savedata, const std::vector<double>& dx2, 
+                          const std::vector<double>& dx4, const std::vector<double>& Sig0, 
+                          const std::vector<double>& SigRe) {
+    std::cout << "Debug: Checking results..." << std::endl;
+    std::cout << "savedata size: " << savedata.size() << std::endl;
+    std::cout << "dx2 size: " << dx2.size() << std::endl;
+    std::cout << "dx4 size: " << dx4.size() << std::endl;
+    std::cout << "Sig0 size: " << Sig0.size() << std::endl;
+    std::cout << "SigRe size: " << SigRe.size() << std::endl;
+
+    // Preview of dx2, Sig0, and SigRe (first 10 non-zero entries)
+    std::cout << "dx2: ";
+    int count = 0;
+    for (size_t i = 0; count < 10 && i < dx2.size(); ++i) {
+        if (dx2[i] != 0) {
+            std::cout << dx2[i] << " ";
+            ++count;
+        }
+    }
+    std::cout << std::endl;
+
+    std::cout << "Sig0: ";
+    count = 0;
+    for (size_t i = 0; count < 10 && i < Sig0.size(); ++i) {
+        if (Sig0[i] != 0) {
+            std::cout << Sig0[i] << " ";
+            ++count;
+        }
+    }
+    std::cout << std::endl;
+
+    std::cout << "SigRe: ";
+    count = 0;
+    for (size_t i = 0; count < 10 && i < SigRe.size(); ++i) {
+        if (SigRe[i] != 0) {
+            std::cout << SigRe[i] << " ";
+            ++count;
+        }
+    }
+    std::cout << std::endl;
+}
