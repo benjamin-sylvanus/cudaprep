@@ -41,13 +41,13 @@ double distance2(const double4 &lhs, const double4 &rhs);
 double3 initPosition(int gid, const double *dx2, int3 &Bounds, std::mt19937 &gen,
                      const double *SimulationParams, const double4 *d4swc, const int *nlut, const int *NewIndex,
                      int3 &IndexSize, int size, int iter, int init_in, bool debug, double3 point);
-void computeNext(double3 &A, double step, double4 &xi, double3 &nextpos, const double &pi);
-void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &upper, int3 &lower, int3 &floorpos,
-                double *reflections, double *uref, int gid, int i, int size, int iter, int *flips);
-bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos, const int *NewIndex, const double4 *d4swc, double &fstep);
 
-void set(double *lhs, int3 &index, double3 &rhs);
+void computeNext(double3 &A, double step, double4 &xi, double3 &nextpos, const double &pi);
+
+void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &upper, int3 &lower, int3 &floorpos,
+                double *reflections, double *uref, int gid, int i, int size, int iter, int *flips, bool debug);
+bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos, const int *NewIndex, const double4 *d4swc, double &fstep); 
 
 void diffusionTensor(double3 *A, double3 *xnot, double vsize, double *dx2, double *dx4, double3 *d2, int i, int gid, int iter, int size);
-
+double dot(double3 a, double3 b);
 #endif // FUNCS_H

@@ -73,23 +73,23 @@ std::vector<Variable> DemoCreator::generateDemoData() {
     };
 
     // Generate all variables
-    createVar("particle_num", "double", 0, {1}, [&]() { return static_cast<double>(particleNum); });
-    createVar("step_num", "double", 1, {1}, [&]() { return 1000.0; });
-    createVar("step_size", "float", 2, {1}, [&]() { return static_cast<float>(dis(gen)); });
-    createVar("perm_prob", "float", 3, {1}, [&]() { return static_cast<float>(dis(gen)); });
-    createVar("init_in", "double", 4, {1}, [&]() { return dis(gen); });
-    createVar("D0", "double", 5, {1}, [&]() { return dis(gen); });
-    createVar("d", "double", 6, {1}, [&]() { return dis(gen); });
-    createVar("scale", "double", 7, {1}, [&]() { return dis(gen); });
-    createVar("tstep", "double", 8, {1}, [&]() { return dis(gen); });
-    createVar("vsize", "double", 9, {1}, [&]() { return dis(gen); });
+    createVar("particle_num", "double", 0, {1, 1}, [&]() { return static_cast<double>(particleNum); });
+    createVar("step_num", "double", 1, {1, 1}, [&]() { return 1000.0; });
+    createVar("step_size", "float", 2, {1, 1}, [&]() { return static_cast<float>(dis(gen)); });
+    createVar("perm_prob", "float", 3, {1,1}, [&]() { return static_cast<float>(dis(gen)); });
+    createVar("init_in", "double", 4, {1, 1}, [&]() { return dis(gen); });
+    createVar("D0", "double", 5, {1, 1}, [&]() { return dis(gen); });
+    createVar("d", "double", 6, {1, 1}, [&]() { return dis(gen); });
+    createVar("scale", "double", 7, {1, 1}, [&]() { return dis(gen); });
+    createVar("tstep", "double", 8, {1, 1}, [&]() { return dis(gen); });
+    createVar("vsize", "double", 9, {1, 1}, [&]() { return dis(gen); });
     createVar("swcmat", "double", 10, {particleNum, 4}, [&]() { return dis(gen); });
-    createVar("LUT", "uint32", 11, {particleNum}, [&]() { return uint32_dis(gen); });
-    createVar("C", "int32", 12, {particleNum}, [&]() { return int32_dis(gen); });
-    createVar("pairs", "uint64", 13, {particleNum * 2}, [&]() { return uint64_dis(gen); });
-    createVar("boundSize", "int64", 14, {3}, [&]() { return int64_dis(gen); });
-    createVar("encodings", "float", 15, {particleNum * 3}, [&]() { return static_cast<float>(dis(gen)); });
-    createVar("cfgmat", "double", 16, {particleNum * 3}, [&]() { return dis(gen); });
+    createVar("LUT", "uint32", 11, {particleNum, 1}, [&]() { return uint32_dis(gen); });
+    createVar("C", "int32", 12, {particleNum, 1}, [&]() { return int32_dis(gen); });
+    createVar("pairs", "uint64", 13, {particleNum, 2}, [&]() { return uint64_dis(gen); });
+    createVar("boundSize", "int64", 14, {3, 1}, [&]() { return int64_dis(gen); });
+    createVar("encodings", "float", 15, {particleNum, 3}, [&]() { return static_cast<float>(dis(gen)); });
+    createVar("cfgmat", "double", 16, {particleNum, 3}, [&]() { return dis(gen); });
 
     return variables;
 }
