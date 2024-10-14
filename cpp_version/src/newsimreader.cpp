@@ -38,79 +38,79 @@ std::vector<Variable> NewSimReader::parseJson(const std::string& jsonFilePath) {
     return parsedVariables;
 }
 
+
 void NewSimReader::readBinaryFile(const std::string& binaryFilePath, std::vector<Variable>& variables) {
     std::ifstream file(binaryFilePath, std::ios::binary);
     if (!file.is_open()) {
         throw std::runtime_error("Failed to open binary file: " + binaryFilePath);
     }
-
     file.seekg(0, std::ios::end);
-    std::streampos fileSize = file.tellg();
+    const std::streampos fileSize = file.tellg();
     file.seekg(0, std::ios::beg);
-
     printf("Binary file size: %.2f MB\n", static_cast<double>(fileSize) / (1024 * 1024));
-
-    printf("=======================================================================\n");
-    printf("%-30s%-30s%-30s\n", "Variable Name", "Read Time (ms)", "Size");
-    printf("=======================================================================\n");
-
-    for (auto& var : variables) {
+    printf("=====================================================================================================\n");
+    printf("%-30s%-30s%-30s%-30s\n", "Variable Name", "Read Time (ms)", "Size", "Dimensions");
+    printf("=====================================================================================================\n");
+    for (auto&[name, type, size, order, data] : variables) {
         auto varReadStart = std::chrono::high_resolution_clock::now();
+        int totalSize = std::accumulate(size.begin(), size.end(), 1, std::multiplies<int>());
 
-        int totalSize = std::accumulate(var.size.begin(), var.size.end(), 1, std::multiplies<int>());
-
-        if (var.type == "double") {
-            double* values = new double[totalSize];
+        if (type == "double") {
+            auto* values = new double[totalSize];
             file.read(reinterpret_cast<char*>(values), totalSize * sizeof(double));
-            var.data = values;
-        } else if (var.type == "float") {
-            float* values = new float[totalSize];
+            data = values;
+        } else if (type == "float") {
+            auto* values = new float[totalSize];
             file.read(reinterpret_cast<char*>(values), totalSize * sizeof(float));
-            var.data = values;
-        } else if (var.type == "uint32") {
-            uint32_t* values = new uint32_t[totalSize];
+            data = values;
+        } else if (type == "uint32") {
+            auto values = new uint32_t[totalSize];
             file.read(reinterpret_cast<char*>(values), totalSize * sizeof(uint32_t));
-            var.data = values;
-        } else if (var.type == "int32") {
-            int32_t* values = new int32_t[totalSize];
+            data = values;
+        } else if (type == "int32") {
+            auto* values = new int32_t[totalSize];
             file.read(reinterpret_cast<char*>(values), totalSize * sizeof(int32_t));
-            var.data = values;
-        } else if (var.type == "uint64") {
-            uint64_t* values = new uint64_t[totalSize];
+            data = values;
+        } else if (type == "uint64") {
+            auto* values = new uint64_t[totalSize];
             file.read(reinterpret_cast<char*>(values), totalSize * sizeof(uint64_t));
-            var.data = values;
-        } else if (var.type == "int64") {
-            int64_t* values = new int64_t[totalSize];
+            data = values;
+        } else if (type == "int64") {
+            auto* values = new int64_t[totalSize];
             file.read(reinterpret_cast<char*>(values), totalSize * sizeof(int64_t));
-            var.data = values;
+            data = values;
         } else {
-            fprintf(stderr, "Unsupported data type: %s for variable: %s\n", var.type.c_str(), var.name.c_str());
+            fprintf(stderr, "Unsupported data type: %s for variable: %s\n", type.c_str(), name.c_str());
         }
 
         auto varReadEnd = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double, std::milli> varReadTime = varReadEnd - varReadStart;
 
-        const double sizeInBytes = totalSize * (var.type == "double" ? sizeof(double) : sizeof(uint64_t));
+        const double sizeInBytes = totalSize * (type == "double" ? sizeof(double) : sizeof(uint64_t));
         std::string sizeStr = formatSize(sizeInBytes);
 
-        printf("%-30s%-30.6f%-30s\n", var.name.c_str(), varReadTime.count(), sizeStr.c_str());
-        printf("-----------------------------------------------------------------------\n");
+        printf("%-30s%-30.6f%-30s%d", name.c_str(), varReadTime.count(), sizeStr.c_str(), size[0]);
+        for (int i=1; i<size.size(); i++) {
+            printf("x%d", size[i]);
+        }
+        printf("%-30s\n","");
+        printf("-----------------------------------------------------------------------------------------------------\n");
     }
 }
 
 void NewSimReader::extractData(const std::vector<Variable>& variables, double& particleNum, double& stepNum, double& stepSize, double& permProb,
                                double& initIn, double& D0, double& d, double& scale, double& tstep, double& vsize,
-                               double*& swcmat, uint32_t*& LUT, int32_t*& C, uint64_t*& pairs, int64_t*& boundSize,
-                               float*& encodings, double*& cfgmat, bool debug) {
+                               double*& swcmat, uint64_t*& LUT, uint64_t*& C, uint64_t*& pairs, uint64_t*& boundSize,
+                               bool debug) {
     for (const auto& var : variables) {
         if (var.name == "particle_num" && std::holds_alternative<double*>(var.data)) {
             particleNum = *std::get<double*>(var.data);
         } else if (var.name == "step_num" && std::holds_alternative<double*>(var.data)) {
             stepNum = *std::get<double*>(var.data);
-        } else if (var.name == "step_size" && std::holds_alternative<float*>(var.data)) {
-            stepSize = *std::get<float*>(var.data);
-        } else if (var.name == "perm_prob" && std::holds_alternative<float*>(var.data)) {
-            permProb = *std::get<float*>(var.data);
+        } else if (var.name == "step_size" && std::holds_alternative<double*>(var.data)) {
+            stepSize = *std::get<double*>(var.data);
+        } else if (var.name == "perm_prob" && std::holds_alternative<double*>(var.data)) {
+            permProb = *std::get<double*>(var.data);
         } else if (var.name == "init_in" && std::holds_alternative<double*>(var.data)) {
             initIn = *std::get<double*>(var.data);
         } else if (var.name == "D0" && std::holds_alternative<double*>(var.data)) {
@@ -125,27 +125,19 @@ void NewSimReader::extractData(const std::vector<Variable>& variables, double& p
             vsize = *std::get<double*>(var.data);
         } else if (var.name == "swcmat" && std::holds_alternative<double*>(var.data)) {
             swcmat = std::get<double*>(var.data);
-        } else if (var.name == "LUT" && std::holds_alternative<uint32_t*>(var.data)) {
-            LUT = std::get<uint32_t*>(var.data);
-        } else if (var.name == "C" && std::holds_alternative<int32_t*>(var.data)) {
-            C = std::get<int32_t*>(var.data);
+        } else if (var.name == "LUT" && std::holds_alternative<uint64_t*>(var.data)) {
+            LUT = std::get<uint64_t*>(var.data);
+        } else if (var.name == "C" && std::holds_alternative<uint64_t*>(var.data)) {
+            C = std::get<uint64_t*>(var.data);
         } else if (var.name == "pairs" && std::holds_alternative<uint64_t*>(var.data)) {
             pairs = std::get<uint64_t*>(var.data);
-        } else if (var.name == "boundSize" && std::holds_alternative<int64_t*>(var.data)) {
-            boundSize = std::get<int64_t*>(var.data);
-        } else if (var.name == "encodings" && std::holds_alternative<float*>(var.data)) {
-            encodings = std::get<float*>(var.data);
-        } else if (var.name == "cfgmat" && std::holds_alternative<double*>(var.data)) {
-            cfgmat = std::get<double*>(var.data);
+        } else if (var.name == "boundSize" && std::holds_alternative<uint64_t*>(var.data)) {
+            boundSize = std::get<uint64_t*>(var.data);
         }
     }
 }
 
-/**
- *
- * @param bytes
- * @return string
- */
+
 std::string NewSimReader::formatSize(double bytes) {
     const char *units[] = {"B", "KB", "MB", "GB", "TB"};
     int i = 0;
@@ -155,13 +147,14 @@ std::string NewSimReader::formatSize(double bytes) {
     }
     char buffer[64];
     snprintf(buffer, sizeof(buffer), "%.2f %s", bytes, units[i]);
-    return std::string(buffer);
+    return {buffer};
 }
+
 void NewSimReader::previewConfig(
     const std::vector<Variable>& variables, double& particleNum, double& stepNum, double& stepSize, double& permProb,
     double& initIn, double& D0, double& d, double& scale, double& tstep, double& vsize,
-    double*& swcmat, uint32_t*& LUT, int32_t*& C, uint64_t*& pairs, int64_t*& boundSize,
-    float*& encodings, double*& cfgmat, bool debug) {
+    double*& swcmat, uint64_t*& LUT, uint64_t*& C, uint64_t*& pairs, uint64_t*& boundSize,
+    bool debug) {
 
     printf("Extracted Data:\n");
 
@@ -183,7 +176,7 @@ void NewSimReader::previewConfig(
         }
     };
 
-    printValue("particleNum", particleNum);
+    printf("particleNum = %.0f\n", particleNum);
     printValue("stepNum", stepNum);
     printValue("stepSize", stepSize);
     printValue("permProb", permProb);
@@ -194,13 +187,20 @@ void NewSimReader::previewConfig(
     printValue("tstep", tstep);
     printValue("vsize", vsize);
 
-    printFirstThree("swcmat", swcmat);
+
+    for (const auto& var : variables) {
+        if (var.name == "swcmat") {
+            printf("size of swcmat = %dx%d\n", var.size[0], var.size[1]);
+            const int nrow = var.size[0];
+            for (int i = 0; i < 20; i++) {
+                printf("%f %f %f %f %f %f\n", swcmat[i + nrow * 0],swcmat[i + nrow * 1],swcmat[i + nrow * 2],swcmat[i + nrow * 3],swcmat[i + nrow * 4],swcmat[i + nrow * 5]);
+            }
+        }
+    }
     printFirstThree("LUT", LUT);
     printFirstThree("C", C);
     printFirstThree("pairs", pairs);
     printFirstThree("boundSize", boundSize);
-    printFirstThree("encodings", encodings);
-    printFirstThree("cfgmat", cfgmat);
 
     if (debug) {
         printf("Debug: All variables extracted successfully.\n");

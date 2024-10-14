@@ -1,13 +1,14 @@
 #include "funcs.h"
-#include <vector>
-#include <iostream>
-#include <cmath>
-#include <random>
-#include <fstream>
 #include <algorithm>
+#include <cmath>
+#include <fstream>
+#include <iostream>
 #include <numeric>
+#include <random>
+#include <vector>
 #include <sys/stat.h>
 #include "cuda_replacements.h"
+#include "overloads.h"
 
 bool swc2v(double3 nextpos, double4 child, double4 parent, double dist) {
     bool pos;
@@ -47,8 +48,8 @@ int s2i(int3 i, int3 b) {
     return b.x * (b.y * i.z + i.y) + i.x;
 }
 
-double3 initPosition(int gid, double *dx2, int3 &Bounds, std::mt19937 &gen,
-                     double *SimulationParams, double4 *d4swc, int *nlut, int *NewIndex,
+double3 initPosition(int gid, const double *dx2, int3 &Bounds, std::mt19937 &gen,
+                     const double *SimulationParams, const double4 *d4swc, const int *nlut, const int *NewIndex,
                      int3 &IndexSize, int size, int iter, int init_in, bool debug, double3 point) {
     std::uniform_real_distribution<> dis(0.0, 1.0);
     double3 nextpos, A;
@@ -105,6 +106,18 @@ double3 initPosition(int gid, double *dx2, int3 &Bounds, std::mt19937 &gen,
 }
 
 void diffusionTensor(double3 *A, double3 *xnot, double vsize, double *dx2, double *dx4, double3 *d2, int i, int gid, int iter, int size) {
+    // if (gid == 1) {
+    //     printf("A: %f %f %f\n", A->x, A->y, A->z);
+    //     printf("xnot: %f %f %f\n", xnot->x, xnot->y, xnot->z);
+    //     printf("vsize: %f\n", vsize);
+    //     printf("dx2: %f %f %f %f %f %f\n", dx2[0], dx2[1], dx2[2], dx2[3], dx2[4], dx2[5]);
+    //     printf("dx4: %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f\n", dx4[0], dx4[1], dx4[2], dx4[3], dx4[4], dx4[5], dx4[6], dx4[7], dx4[8], dx4[9], dx4[10], dx4[11], dx4[12], dx4[13], dx4[14]);
+    //     printf("d2: %f %f %f\n", d2->x, d2->y, d2->z);
+    //     printf("i: %d\n", i);
+    //     printf("gid: %d\n", gid);
+    //     printf("iter: %d\n", iter);
+    //     printf("size: %d\n", size);
+    // }
     d2->x = std::fabs((A->x - xnot->x) * vsize);
     d2->y = std::fabs((A->y - xnot->y) * vsize);
     d2->z = std::fabs((A->z - xnot->z) * vsize);
@@ -185,7 +198,7 @@ void writeResults(double *w_swc, double *hostSimP, double *hostdx2, double *mdx2
     }
 }
 
-void computeNext(double3 &A, double &step, double4 &xi, double3 &nextpos, double &pi) {
+void computeNext(double3 &A, double step, double4 &xi, double3 &nextpos, const double &pi) {
     double theta = 2 * pi * xi.x;
     double v = xi.y;
     double cos_phi = 2 * v - 1;
@@ -195,7 +208,7 @@ void computeNext(double3 &A, double &step, double4 &xi, double3 &nextpos, double
     nextpos.z = A.z + (step * cos_phi);
 }
 
-bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos, int *NewIndex, double4 *d4swc, double &fstep) {
+bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos, const int *NewIndex, const double4 *d4swc, double &fstep) {
     int3 vindex;
     double4 child, parent;
     double dist2;
@@ -220,6 +233,7 @@ bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos, int *NewI
     }
     return false;
 }
+
 
 void setup_data(double * u_dx2, double * u_dx4, double * u_SimP, double4 * u_D4Swc, int * u_NewLut,
                                     int * u_NewIndex, int * u_Flip, double * simparam, double4 * swc_trim,
@@ -268,4 +282,86 @@ void setup_data(double * u_dx2, double * u_dx4, double * u_SimP, double4 * u_D4S
         memset(u_label, 0.0,  n_vf * sizeof(int));                         // arg in or default
         printf("Set Host Values\n");
     }
+}
+
+
+
+void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &upper, int3 &lower, int3 &floorpos,
+                double *reflections, double *uref, int gid, int i, int size, int iter, int *flips, bool debug) {
+    double3 High = make_double3((double)b_int3.x, (double)b_int3.y, (double)b_int3.z);
+    double3 Low = make_double3(0.0, 0.0, 0.0);
+
+    int3 dix = make_int3(size, iter, 3);
+    int3 did[4];
+    did[0] = make_int3(gid, i, 0);
+    did[1] = make_int3(gid, i, 1);
+    did[2] = make_int3(gid, i, 2);
+    did[3] = make_int3(s2i(did[0], dix), s2i(did[1], dix), s2i(did[2], dix));
+
+    int count = 0;
+    while(true) {
+        int3 UPPER = make_int3(nextpos.x > High.x, nextpos.y > High.y, nextpos.z > High.z);
+        int3 LOWER = make_int3(nextpos.x < Low.x, nextpos.y < Low.y, nextpos.z < Low.z);
+
+        if (!(UPPER.x || UPPER.y || UPPER.z || LOWER.x || LOWER.y || LOWER.z)) {
+            return; // no reflection needed
+        }
+
+        double3 normal;
+        double3 pointOnPlane;
+        int fidx;
+
+        if (LOWER.x) {
+            fidx = 6*gid + 0;
+            pointOnPlane = make_double3(Low.x, nextpos.y, nextpos.z);
+            normal = make_double3(1.0, 0.0, 0.0);
+        } else if (UPPER.x) {
+            fidx = 6*gid + 1;
+            pointOnPlane = make_double3(High.x, nextpos.y, nextpos.z);
+            normal = make_double3(-1.0, 0.0, 0.0);
+        } else if (LOWER.y) {
+            fidx = 6*gid + 2;
+            pointOnPlane = make_double3(nextpos.x, Low.y, nextpos.z);
+            normal = make_double3(0.0, 1.0, 0.0);
+        } else if (UPPER.y) {
+            fidx = 6*gid + 3;
+            pointOnPlane = make_double3(nextpos.x, High.y, nextpos.z);
+            normal = make_double3(0.0, -1.0, 0.0);
+        } else if (LOWER.z) {
+            fidx = 6*gid + 4;
+            pointOnPlane = make_double3(nextpos.x, nextpos.y, Low.z);
+            normal = make_double3(0.0, 0.0, 1.0);
+        } else if (UPPER.z) {
+            fidx = 6*gid + 5;
+            pointOnPlane = make_double3(nextpos.x, nextpos.y, High.z);
+            normal = make_double3(0.0, 0.0, -1.0);
+        }
+
+        double D = -(dot(normal, pointOnPlane));
+        double3 d = pos - nextpos;
+        double t1 = -((dot(normal, nextpos) + D)) / dot(normal, d);
+        double3 intersectionPoint = nextpos + d * t1;
+        double3 reflectionVector = nextpos - intersectionPoint;
+        reflectionVector = reflectionVector - normal * (2 * dot(reflectionVector, normal));
+
+        double3 unreflected = nextpos;
+        nextpos = intersectionPoint + reflectionVector;
+
+        if (debug) {
+            printf("NextPos: %f %f %f -> %f %f %f\n", unreflected.x, unreflected.y, unreflected.z, 
+                   nextpos.x, nextpos.y, nextpos.z);
+            printf("Count: %d\n", count);
+        }
+        count += 1;
+
+        set(reflections, did[3], intersectionPoint);
+        set(uref, did[3], unreflected);
+
+        nextpos = intersectionPoint + reflectionVector;
+        flips[fidx] += 1;
+    }
+}
+
+double dot(double3 a, double3 b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
 }

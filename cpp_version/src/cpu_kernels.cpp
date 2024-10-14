@@ -5,36 +5,23 @@
 #include <cmath>
 #include <algorithm>
 #include <numeric>
-
-// Add these function declarations
-int s2i(int3 i, int3 b);
-bool swc2v(double3 nextpos, double4 child, double4 parent, double dist);
-double distance2(const double4 &lhs, const double4 &rhs);
-double3 initPosition(int gid, double *dx2, int3 &Bounds, std::mt19937 &gen,
-                     double *SimulationParams, double4 *d4swc, int *nlut, int *NewIndex,
-                     int3 &IndexSize, int size, int iter, int init_in, bool debug, double3 point);
-void computeNext(double3 &A, double &step, double4 &xi, double3 &nextpos, double &pi);
-void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &upper, int3 &lower, int3 &floorpos,
-                double *reflections, double *uref, int gid, int i, int size, int iter, int *flips);
-bool checkConnections(int3 i_int3, int test_lutvalue, double3 nextpos, int *NewIndex, double4 *d4swc, double &fstep);
+#include <iostream>
+#include "overloads.h"
 
 // Constants
 const double PI = 3.14159265358979323846;
 
 void volfrac_cpu(const std::vector<double4>& d4swc, const std::vector<int>& nlut, const std::vector<int>& NewIndex,
-                  int3 Bounds, int3 IndexSize, int n, std::vector<int>& label, double& vf) {
-    // Mark unused parameter
-    (void)n;
-
+                  int3 Bounds, int3 IndexSize, int n, std::vector<int>& label, double& vf, bool debug) {
+    if (debug) std::cout << "Debug: Entering volfrac_cpu function with " << n << " samples" << std::endl;
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<> dis(0.0, 1.0);
 
-    int N = 10000000;
-    label.resize(N);
+    label.resize(n);
     int R = 0;
 
-    for (int gid = 0; gid < N; ++gid) {
+    for (int gid = 0; gid < n; ++gid) {
         label[gid] = 0;
         double3 A = make_double3(dis(gen) * Bounds.x, dis(gen) * Bounds.y, dis(gen) * Bounds.z);
         int3 floorpos = make_int3((int)A.x, (int)A.y, (int)A.z);
@@ -49,7 +36,7 @@ void volfrac_cpu(const std::vector<double4>& d4swc, const std::vector<int>& nlut
             if (vindex.x != -1) {
                 double4 child = d4swc[vindex.x];
                 double4 parent = d4swc[vindex.y];
-                double dist2 = distance2(parent, child);
+                double dist2 = std::pow(parent.x - child.x, 2) + std::pow(parent.y - child.y, 2) + std::pow(parent.z - child.z, 2);
                 bool inside = swc2v(A, child, parent, dist2);
 
                 if (inside) {
@@ -59,9 +46,10 @@ void volfrac_cpu(const std::vector<double4>& d4swc, const std::vector<int>& nlut
             }
         }
     }
-
+    if (debug) std::cout << "Debug: Label size: " << label.size() << std::endl;
     R = std::accumulate(label.begin(), label.end(), 0);
-    vf = (double)R / (double)N;
+    vf = (double)R / (double)n;
+    if (debug) std::cout << "Debug: Volume fraction calculated: " << vf << std::endl;
 }
 
 void simulate_cpu(std::vector<double>& savedata, std::vector<double>& dx2, std::vector<double>& dx4, 
@@ -71,16 +59,13 @@ void simulate_cpu(std::vector<double>& savedata, std::vector<double>& dx2, std::
                   std::vector<double>& Uref, std::vector<int>& flip, const std::vector<double>& T2, 
                   std::vector<double>& T, std::vector<double>& Sig0, std::vector<double>& SigRe, 
                   const std::vector<double>& BVec, const std::vector<double>& BVal, const std::vector<double>& TD) {
-    // Mark unused parameters
-    (void)T;
-    (void)SigRe;
-    (void)BVec;
-    (void)BVal;
-    (void)TD;
-
+    if (debug) std::cout << "Debug: Entering simulate_cpu function" << std::endl;
+    
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<> dis(0.0, 1.0);
+
+    if (debug) std::cout << "Debug: Random number generator set up" << std::endl;
 
     double step_size = SimulationParams[2];
     double perm_prob = SimulationParams[3];
@@ -90,32 +75,41 @@ void simulate_cpu(std::vector<double>& savedata, std::vector<double>& dx2, std::
     int Tstep = iter / timepoints;
     double fstep = 1;
 
+    if (debug) std::cout << "Debug: Simulation parameters extracted" << std::endl;
+
     for (int gid = 0; gid < size; ++gid) {
+        if (debug) std::cout << "Debug: Starting simulation for particle " << gid << std::endl;
+
         double3 A = initPosition(gid, dx2.data(), Bounds, gen,
-                                 const_cast<double*>(SimulationParams.data()), 
-                                 const_cast<double4*>(d4swc.data()),
-                                 const_cast<int*>(nlut.data()),
-                                 const_cast<int*>(NewIndex.data()),
+                                 SimulationParams.data(), 
+                                 d4swc.data(),
+                                 nlut.data(),
+                                 NewIndex.data(),
                                  IndexSize, size, iter, init_in, debug, point);
         double3 xnot = A;
         int2 parstate = make_int2(1, 1);
         std::vector<double> t(Nc, 0);
 
+        if (debug) std::cout << "Debug: Particle " << gid << " initialized at position (" << A.x << ", " << A.y << ", " << A.z << ")" << std::endl;
+
         for (int i = 0; i < iter; ++i) {
+            if (debug && i % 100 == 0) {
+                std::cout << "Debug: Particle " << gid << ", Iteration " << i << std::endl;
+            }
+
             double4 xi = make_double4(dis(gen), dis(gen), dis(gen), dis(gen));
             bool completes = xi.w < perm_prob;
             double3 nextpos;
-            double pi = PI;
-            computeNext(A, step_size, xi, nextpos, pi);
+            computeNext(A, step_size, xi, nextpos, PI);
 
             int3 upper, lower, floorpos;
             validCoord(nextpos, A, Bounds, upper, lower, floorpos, Reflections.data(), Uref.data(), 
-                       gid, i, size, iter, flip.data());
+                       gid, i, size, iter, flip.data(), debug);
             floorpos = make_int3((int)nextpos.x, (int)nextpos.y, (int)nextpos.z);
             int test_lutvalue = nlut[s2i(floorpos, Bounds)];
             bool inside = checkConnections(IndexSize, test_lutvalue, nextpos,
-                                           const_cast<int*>(NewIndex.data()),
-                                           const_cast<double4*>(d4swc.data()), fstep);
+                                           NewIndex.data(),
+                                           d4swc.data(), fstep);
 
             parstate.y = inside ? 1 : 0;
 
@@ -148,7 +142,7 @@ void simulate_cpu(std::vector<double>& savedata, std::vector<double>& dx2, std::
                 int3 dix = make_int3(size, iter, 3);
                 int3 did[3] = {make_int3(gid, i, 0), make_int3(gid, i, 1), make_int3(gid, i, 2)};
                 int3 didx = make_int3(s2i(did[0], dix), s2i(did[1], dix), s2i(did[2], dix));
-                setData(savedata.data(), didx, A);
+                set(savedata.data(), didx, A);
             }
 
             // Store Tensor Data
@@ -170,46 +164,9 @@ void simulate_cpu(std::vector<double>& savedata, std::vector<double>& dx2, std::
                 }
             }
         }
+
+        if (debug) std::cout << "Debug: Simulation completed for particle " << gid << std::endl;
     }
-}
 
-// Add these function declarations at the top of the file
-void setData(double* data, int3 idx, double3 value);
-void diffusionTensor(double3* A, double3* xnot, double vsize, double* dx2, double* dx4, double3* d2, int i, int gid, int iter, int size);
-
-double distance2(const double4 &lhs, const double4 &rhs) {
-    double dx = lhs.x - rhs.x;
-    double dy = lhs.y - rhs.y;
-    double dz = lhs.z - rhs.z;
-    return dx*dx + dy*dy + dz*dz;
-}
-
-void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &upper, int3 &lower, int3 &floorpos,
-                double *reflections, double *uref, int gid, int i, int size, int iter, int *flips) {
-    // Mark unused parameters
-    (void)pos;
-    (void)reflections;
-    (void)uref;
-    (void)gid;
-    (void)i;
-    (void)size;
-    (void)iter;
-    (void)flips;
-
-    // Implement the logic for validCoord here
-    upper = make_int3(b_int3.x - 1, b_int3.y - 1, b_int3.z - 1);
-    lower = make_int3(0, 0, 0);
-    floorpos = make_int3((int)nextpos.x, (int)nextpos.y, (int)nextpos.z);
-
-    // Ensure nextpos is within bounds
-    nextpos.x = std::max(0.0, std::min((double)upper.x, nextpos.x));
-    nextpos.y = std::max(0.0, std::min((double)upper.y, nextpos.y));
-    nextpos.z = std::max(0.0, std::min((double)upper.z, nextpos.z));
-}
-
-void setData(double* data, int3 idx, double3 value) {
-    int index = idx.x * 3 + idx.y * 3 * idx.z + idx.z;
-    data[index] = value.x;
-    data[index + 1] = value.y;
-    data[index + 2] = value.z;
+    if (debug) std::cout << "Debug: Exiting simulate_cpu function" << std::endl;
 }
