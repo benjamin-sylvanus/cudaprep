@@ -19,12 +19,10 @@ add_subdirectory(demo_creator)
 # Source files
 set(SOURCES
     main.cpp
-
     ${CMAKE_SOURCE_DIR}/src/newsimreader.cpp
     ${CMAKE_SOURCE_DIR}/src/funcs.cpp
     ${CMAKE_SOURCE_DIR}/src/overloads.cpp
     ${CMAKE_SOURCE_DIR}/src/cpu_kernels.cpp
-        main.cpp
 )
 
 # Header files
@@ -32,10 +30,10 @@ set(HEADERS
     ${CMAKE_SOURCE_DIR}/src/newsimreader.h
     ${CMAKE_SOURCE_DIR}/src/funcs.h
     ${CMAKE_SOURCE_DIR}/src/overloads.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/cuda_replacements.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Variable.h
+    ${CMAKE_SOURCE_DIR}/src/cuda_replacements.h
+    ${CMAKE_SOURCE_DIR}/src/Variable.h
     ${CMAKE_SOURCE_DIR}/src/cpu_kernels.h
-        main.cpp
+    ${CMAKE_SOURCE_DIR}/src/datatemplate.h
 )
 
 # Create executable
@@ -44,14 +42,13 @@ add_executable(CudaPrepCPP ${SOURCES} ${HEADERS})
 # Include directories
 target_include_directories(CudaPrepCPP PRIVATE 
     ${CMAKE_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/demo_creator/include  # Add this line
+    ${CMAKE_SOURCE_DIR}/demo_creator/include
 )
 
 # Link libraries
 target_link_libraries(CudaPrepCPP PRIVATE 
     nlohmann_json::nlohmann_json
-    demo_creator  # Add this line
+    demo_creator
 )
 
 # Set compiler flags
