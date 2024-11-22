@@ -389,23 +389,23 @@ void logSimulationResults(const std::vector<double>& savedata, const std::vector
     }
     std::cout << std::endl;
 
-    std::cout << "Sig0: ";
-    count = 0;
-    for (size_t i = 0; count < 10 && i < Sig0.size(); ++i) {
-        if (Sig0[i] != 0) {
-            std::cout << Sig0[i] << " ";
-            ++count;
-        }
-    }
-    std::cout << std::endl;
+    // std::cout << "Sig0: ";
+    // count = 0;
+    // for (size_t i = 0; count < 10 && i < Sig0.size(); ++i) {
+    //     if (Sig0[i] != 0) {
+    //         std::cout << Sig0[i] << " ";
+    //         ++count;
+    //     }
+    // }
+    // std::cout << std::endl;
 
-    std::cout << "SigRe: ";
-    count = 0;
-    for (size_t i = 0; count < 10 && i < SigRe.size(); ++i) {
-        if (SigRe[i] != 0) {
-            std::cout << SigRe[i] << " ";
-            ++count;
-        }
-    }
-    std::cout << std::endl;
+    // std::cout << "SigRe: ";
+    // count = 0;
+    // for (size_t i = 0; count < 10 && i < SigRe.size(); ++i) {
+    //     if (SigRe[i] != 0) {
+    //         std::cout << SigRe[i] << " ";
+    //         ++count;
+    //     }
+    // }
+    // std::cout << std::endl;
 }
