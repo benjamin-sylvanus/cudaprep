@@ -51,6 +51,10 @@ void NewSimReader::readBinaryFile(const std::string& binaryFilePath, std::vector
     printf("=====================================================================================================\n");
     printf("%-30s%-30s%-30s%-30s\n", "Variable Name", "Read Time (ms)", "Size", "Dimensions");
     printf("=====================================================================================================\n");
+
+    double totalReadTime = 0.0;
+    double totalMemory = 0.0;
+
     for (auto&[name, type, size, order, data] : variables) {
         auto varReadStart = std::chrono::high_resolution_clock::now();
         int totalSize = std::accumulate(size.begin(), size.end(), 1, std::multiplies<int>());
@@ -89,6 +93,9 @@ void NewSimReader::readBinaryFile(const std::string& binaryFilePath, std::vector
         const double sizeInBytes = totalSize * (type == "double" ? sizeof(double) : sizeof(uint64_t));
         std::string sizeStr = formatSize(sizeInBytes);
 
+        totalReadTime += varReadTime.count();
+        totalMemory += sizeInBytes;
+
         printf("%-30s%-30.6f%-30s%d", name.c_str(), varReadTime.count(), sizeStr.c_str(), size[0]);
         for (int i=1; i<size.size(); i++) {
             printf("x%d", size[i]);
@@ -96,6 +103,10 @@ void NewSimReader::readBinaryFile(const std::string& binaryFilePath, std::vector
         printf("%-30s\n","");
         printf("-----------------------------------------------------------------------------------------------------\n");
     }
+
+    printf("=====================================================================================================\n");
+    printf("%-30s%-30.6f%-30s\n", "Total", totalReadTime, formatSize(totalMemory).c_str());
+    printf("=====================================================================================================\n");
 }
 
 void NewSimReader::extractData(const std::vector<Variable>& variables, double& particleNum, double& stepNum, double& stepSize, double& permProb,

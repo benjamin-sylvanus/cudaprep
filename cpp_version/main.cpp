@@ -12,11 +12,10 @@
 int main() {
     std::chrono::high_resolution_clock::time_point start_c, stop_c;
     start_c = std::chrono::high_resolution_clock::now();
+    const std::string root = "/Users/benjaminsylvanus/Documents/mgh/project/data/simulation_configs/test";
+    const std::string binaryFile =root + "/simulation_config.bin";
+    const std::string jsonFile = root + "/simulation_config.json";
 
-    // Initialize simulation parameters
-    const std::string binaryFile = "/Users/benjaminsylvanus/Documents/mgh/json-writer/simulation_configs/853035674/simulation_config.bin";
-    const std::string jsonFile = "/Users/benjaminsylvanus/Documents/mgh/json-writer/simulation_configs/853035674/simulation_config.json";
-    
     // Add a debug flag
     bool debug;
     debug = false;
@@ -47,8 +46,9 @@ int main() {
         NewSimReader::previewConfig(variables, particleNum, stepNum, stepSize, permProb, initIn, D0, d, scale, tstep, vsize,
                                   swcmat, LUT, C, pairs, boundSize, true);
         // Set up simulation parameters
+        // cpu version low concurrency limit
         int size =  50000;
-        int iter =  10000;
+        int iter =  12500;
         int SaveAll = 0; // Assuming we want to save all data
         int3 Bounds = make_int3(boundSize[0], boundSize[1], boundSize[2]);
         
@@ -94,7 +94,7 @@ int main() {
         size_t prod = boundSize[0] * boundSize[1] * boundSize[2];
 
         // Perform volume fraction calculation
-        int volfrac_samples = 10000;  // Or any other desired number of samples
+        int volfrac_samples = 100000;  // Or any other desired number of samples
         std::vector<int> label(volfrac_samples);
         double vf = 0.0;
         std::vector swcmat_vec(reinterpret_cast<double4*>(swcmat), reinterpret_cast<double4*>(swcmat) + nrow);
@@ -102,16 +102,13 @@ int main() {
         std::vector<int> C_vec(C, C + 3);
         volfrac_cpu(swcmat_vec, LUT_vec, C_vec, Bounds, 
                     make_int3(C[0], C[1], C[2]), volfrac_samples, label, vf, debug);
-
         std::cout << "Volume Fraction: " << vf << std::endl;
-
         // Debug output
         if (debug) {
             std::cout << "Debug: Preparing for simulation..." << std::endl;
             std::cout << "Size: " << size << ", Iter: " << iter << std::endl;
             std::cout << "Bounds: " << Bounds.x << ", " << Bounds.y << ", " << Bounds.z << std::endl;
         }
-
         // After extracting data from variables
         std::vector SimulationParams = {
             static_cast<double>(size),  // particle_num
@@ -125,7 +122,6 @@ int main() {
             tstep,
             vsize
         };
-
         // Debug output
         if (debug) {
             std::cout << "Debug: SimulationParams:" << std::endl;
@@ -135,7 +131,6 @@ int main() {
         }
         // Reset other data structures as needed
         unsigned int num_threads = std::thread::hardware_concurrency() / 4;
-
         // Perform simulation with 4 thread
         std::cout << "Running simulation with " << num_threads << " threads..." << std::endl;
         start_c = std::chrono::high_resolution_clock::now();
@@ -167,7 +162,7 @@ int main() {
         std::fill(BVal.begin(), BVal.end(), 0.0);
         std::fill(TD.begin(), TD.end(), 0.0);
         // Reset other data structures as needed
-        num_threads = std::max(static_cast<int>(std::thread::hardware_concurrency() / 2), 12);
+        num_threads = std::max(static_cast<int>(std::thread::hardware_concurrency() / 2), 8);
         // Perform simulation with 10 threads
         std::cout << "Running simulation with " << num_threads << " threads..." << std::endl;
         start_c = std::chrono::high_resolution_clock::now();
@@ -180,14 +175,11 @@ int main() {
         stop_c = std::chrono::high_resolution_clock::now();
         duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop_c - start_c);
         std::cout << "Simulation took " << duration.count() / 1000.0 << " seconds" << std::endl;
-
         debug=true;
         // Debug output after simulation
         if (debug) {
             logSimulationResults(savedata, dx2, dx4, Sig0, SigRe);
         }
-
-
 
         // Write results (you'll need to implement this function)
         // writeResults(swcmat, SimulationParams, dx2, dx4, T, Reflections, Uref, Sig0, SigRe, savedata, 

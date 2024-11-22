@@ -90,7 +90,6 @@ __global__ void volfrac(curandStatePhilox4_32_10_t *state, int3 Bounds, double4 
     }
     if (gid < N)
     {
-
         label[gid] = 0;
         int R = 0;
         double3 nextpos;
@@ -104,6 +103,7 @@ __global__ void volfrac(curandStatePhilox4_32_10_t *state, int3 Bounds, double4 
         double4 xr;
         double3 A;
         bool cont = true;
+
         // init local state var
         xr = curand_uniform4_double(&localstate);
 
@@ -224,7 +224,7 @@ __global__ void simulate(double *savedata, double *dx2, double *dx4, int3 Bounds
     int gid = threadIdx.x + blockDim.x * blockIdx.x;
     if (gid < size)
     {
-        /**
+        /** TODO: Verify this order is still correct  
             @index particle_num = SimulationParams[0]
             @index step_num = SimulationParams[1]
             @index step_size = SimulationParams[2]
