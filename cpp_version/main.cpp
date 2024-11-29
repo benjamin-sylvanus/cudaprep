@@ -9,20 +9,25 @@
 #include "cuda_replacements.h"
 #include "funcs.h"
 
-int main() {
+int main(int argc, char *argv[]) {
+    std::string root;
+    // Parse config path from arguments
+    if (argc < 2) {
+        root = "data/simulation_configs/test";
+    } else {
+        root = argv[1];
+    }
+
+    const std::string binaryFile = root + "/simulation_config.bin";
+    const std::string jsonFile = root + "/simulation_config.json";
     std::chrono::high_resolution_clock::time_point start_c, stop_c;
     start_c = std::chrono::high_resolution_clock::now();
-    const std::string root = "/Users/benjaminsylvanus/Documents/mgh/project/data/simulation_configs/test";
-    const std::string binaryFile =root + "/simulation_config.bin";
-    const std::string jsonFile = root + "/simulation_config.json";
 
     // Add a debug flag
     bool debug;
     debug = false;
-    try {
 
-        // Create a NewSimReader instance
-        NewSimReader simReader("configFile");
+    try {
 
         // Parse the JSON file
         std::vector<Variable> variables = NewSimReader::parseJson(jsonFile);
