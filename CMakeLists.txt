@@ -25,6 +25,7 @@ find_library(CURAND_LIBRARY curand HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib64)
 find_library(CUSPARSE_LIBRARY cusparse HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib64)
 
 include_directories(${CMAKE_SOURCE_DIR})
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
 
 
 set(SOURCES
@@ -65,5 +66,8 @@ add_custom_command(
 )
 
 add_executable(app ${CMAKE_CURRENT_BINARY_DIR}/bin/main.o ${CMAKE_CURRENT_BINARY_DIR}/bin/gpuCode.o ${OBJECTS})
+
+set_directory_properties(PROPERTIES ADDITIONAL_CLEAN_FILES "${CMAKE_CURRENT_BINARY_DIR}/bin")
+
 set_target_properties(app PROPERTIES LINKER_LANGUAGE CUDA)
 target_link_libraries(app ${CUBLAS_LIBRARY} ${CURAND_LIBRARY} ${CUSPARSE_LIBRARY} ${CUDA_LIBRARIES} nlohmann_json::nlohmann_json)
