@@ -71,3 +71,4 @@ set_directory_properties(PROPERTIES ADDITIONAL_CLEAN_FILES "${CMAKE_CURRENT_BINA
 
 set_target_properties(app PROPERTIES LINKER_LANGUAGE CUDA)
 target_link_libraries(app ${CUBLAS_LIBRARY} ${CURAND_LIBRARY} ${CUSPARSE_LIBRARY} ${CUDA_LIBRARIES} nlohmann_json::nlohmann_json)
+
