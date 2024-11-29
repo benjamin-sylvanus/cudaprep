@@ -421,7 +421,7 @@ int main(int argc, char *argv[])
     std::string root;
     // Parse config path from arguments
     if (argc < 2) {
-        root = "/autofs/space/symphony_002/users/BenSylvanus/cuda/Sims";
+        root = "data/simulation_configs/test";
     } else {
         root = argv[1];
     }
