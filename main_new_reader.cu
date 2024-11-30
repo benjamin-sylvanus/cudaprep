@@ -1,3 +1,4 @@
+#include "./src/newsimreader.h"
 #include "./src/simreader.h"
 #include "./src/simulation.h"
 #include "./src/controller.h"
@@ -416,8 +417,9 @@ int main(int argc, char *argv[])
     cudaEventCreate(&start_c);
     cudaEventCreate(&stop_c);
     float milliseconds = 0;
+    int NC = 2;
     system("clear");
-
+    int SaveAll = 1;
     std::string root;
     // Parse config path from arguments
     if (argc < 2) {
@@ -433,7 +435,8 @@ int main(int argc, char *argv[])
     NewSimReader::readBinaryFile(binaryFile, variables);
 
     // Initialize variables to hold extracted data
-    double particleNum = 0, stepNum = 0, stepSize = 0, permProb = 0;
+    uint64_t particleNum = 0, stepNum = 0;
+    double stepSize = 0, permProb = 0;
     double initIn = 0, D0 = 0, d = 0, scale = 0, tstep = 0, vsize = 0;
     double *swcmat = nullptr;
     uint64_t *LUT = nullptr;
@@ -445,24 +448,27 @@ int main(int argc, char *argv[])
     NewSimReader::extractData(variables, particleNum, stepNum, stepSize, permProb,
                             initIn, D0, d, scale, tstep, vsize,
                             swcmat, LUT, C, pairs, boundSize, true);
+    NewSimReader::previewConfig(variables, particleNum, stepNum, stepSize, permProb, initIn, D0, d, scale, tstep, vsize,
+                            swcmat, LUT, C, pairs, boundSize, true);
+
 
     // Get array dimensions from variables
-    std::vector<std::vector<uint64_t>> arrdims;
-    std::vector<uint64_t> swc_dims, lut_dims, index_dims, pairs_dims, bounds_dims;
+    std::vector<std::vector<int>> arrdims;
+    std::vector<int> swc_dims, lut_dims, index_dims, pairs_dims, bounds_dims;
 
     for (const auto& var : variables) {
-        if (var.name == "swcmat") swc_dims = var.size;
-        else if (var.name == "lut") lut_dims = var.size;
-        else if (var.name == "index") index_dims = var.size;
+        if (var.name == "swcmat") {
+            swc_dims = var.size;           
+        }
+        else if (var.name == "LUT") lut_dims = var.size;
+        else if (var.name == "C") index_dims = var.size;
         else if (var.name == "pairs") pairs_dims = var.size;
         else if (var.name == "bounds") bounds_dims = var.size;
     }
 
-    arrdims = {swc_dims, lut_dims, index_dims, pairs_dims, bounds_dims};
-
-    // Calculate new index size
+    arrdims = {swc_dims, lut_dims, index_dims, pairs_dims, bounds_dims};    // Calculate new index size
     int newindexsize = index_dims[0] * index_dims[1] * index_dims[2];
-
+    int LUTSIZE = lut_dims[0] * lut_dims[1] * lut_dims[2];
     // Convert to simulation parameters
     int size = static_cast<int>(particleNum);
     int iter = static_cast<int>(stepNum);
@@ -487,7 +493,6 @@ int main(int argc, char *argv[])
             r_swc[i + nrow * j] = swcmat[i * 6 + j];
         }
     }
-
     // Create double4 array for swc_trim
     double4 swc_trim[nrow];
     double w_swc[nrow * 4];
@@ -503,23 +508,15 @@ int main(int argc, char *argv[])
         w_swc[4 * i + 2] = r_swc[i + nrow * 3];
         w_swc[4 * i + 3] = r_swc[i + nrow * 4];
     }
-
-    // Rest of your existing CUDA code remains exactly the same...
     int block_size = 256;
     dim3 block(block_size);
     dim3 grid((size / block.x) + 1);
-
-    std::vector<uint64_t> lut = LUT;
-    std::vector<uint64_t> indexarr = indexarr;
-    std::vector<std::vector<uint64_t>> arrdims = arrdims;
-    std::vector<uint64_t> swc_dims = arrdims[0];
-    std::vector<uint64_t> lut_dims = arrdims[1];
-    std::vector<uint64_t> index_dims = arrdims[2];
-    std::vector<uint64_t> pairs_dims = arrdims[3];
-    std::vector<uint64_t> bounds_dims = arrdims[4];
+    size_t sa_size = (SaveAll) ? 
+    static_cast<size_t>(particleNum) * static_cast<size_t>(stepNum) : 1;
+    std::vector<uint64_t> lut(LUT, LUT + LUTSIZE);
+    std::vector<uint64_t> indexarr(C,C + newindexsize);
 
     /// Unified Memory
-
     // Declare Unified Memory Pointers
 
     double *u_dx2, *u_dx4, *u_SimP, *u_T2, *u_T, *u_SigRe, *u_Sig0, *u_bvec,
@@ -575,7 +572,7 @@ int main(int argc, char *argv[])
     // option for printing in kernel
     bool debug = false;
     double3 point = make_double3(u_D4Swc[0].x, u_D4Swc[0].y, u_D4Swc[0].z);
-    int3 u_Bounds = make_int3(boundx, boundy, boundz);
+    int3 u_Bounds = make_int3(bounds.x, bounds.y, bounds.z);
     int3 u_IndexSize = make_int3(index_dims[0], index_dims[1], index_dims[2]);
 
     // Prefetch data asynchronously
@@ -644,7 +641,7 @@ int main(int argc, char *argv[])
     auto t1 = high_resolution_clock::now();
     // Write Results
     {
-        std::string outpath = sim.getResultPath();
+        std::string outpath = root + "/results";
         writeResults(w_swc, u_SimP, u_dx2, mdx2, u_dx4, mdx4, u_T, u_Reflections, u_uref, u_Sig0, u_SigRe, u_AllData, iter, size, nrow, timepoints, Nbvec, sa_size, SaveAll, outpath);
     }
 
