@@ -172,5 +172,5 @@ __host__ void setup_data(double * u_dx2, double * u_dx4, double * u_SimP, double
                                     double * mdx2, double * mdx4, double * u_AllData,double * u_Reflections, 
                                     double * u_Uref, double * u_T2, double * u_T, double * u_SigRe, double * u_Sig0,
                                     double * u_bvec, double * u_bval, double * u_TD, std::vector<uint64_t> lut, std::vector<uint64_t> indexarr, 
-                                    std::vector<uint64_t> bounds, int size, int iter, int nrow, int prod, int newindexsize, int sa_size, int Nbvec, int timepoints, int NC, int n_vf, double * u_vf, int * u_label);
+                                    int3 bounds, int size, int iter, int nrow, int prod, int newindexsize, size_t sa_size, int Nbvec, int timepoints, int NC, int n_vf, double * u_vf, int * u_label);
  

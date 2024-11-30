@@ -500,16 +500,15 @@ __host__ void setup_data(double * u_dx2, double * u_dx4, double * u_SimP, double
                                     double * mdx2, double * mdx4, double * u_AllData,double * u_Reflections, 
                                     double * u_Uref, double * u_T2, double * u_T, double * u_SigRe, double * u_Sig0,
                                     double * u_bvec, double * u_bval, double * u_TD, std::vector<uint64_t> lut, std::vector<uint64_t> indexarr, 
-                                    std::vector<uint64_t> bounds, int size, int iter, int nrow, int prod, int newindexsize, int sa_size, int Nbvec, int timepoints, int NC, int n_vf, double * u_vf, int * u_label) {
+                                    int3 bounds, int size, int iter, int nrow, int prod, int newindexsize, size_t sa_size, int Nbvec, int timepoints, int NC, int n_vf, double * u_vf, int * u_label) {
     // Set Values for Host
     {
         memset(u_dx2, 0.0, 6 * iter * sizeof(double));
         memset(u_dx4, 0.0, 15 * iter * sizeof(double));
-
         {
             for (int i = 0; i < 10; i++) {
                 u_SimP[i] = simparam[i];
-            }
+            }            
             for (int i = 0; i < nrow; i++) {
                 u_D4Swc[i].x = swc_trim[i].x;
                 u_D4Swc[i].y = swc_trim[i].y;
@@ -523,7 +522,6 @@ __host__ void setup_data(double * u_dx2, double * u_dx4, double * u_SimP, double
                 u_NewIndex[i] = indexarr[i];
             }
         }
-
         memset(mdx2, 0.0, 6 * iter * sizeof(double));
         memset(mdx4, 0.0, 15 * iter * sizeof(double));
         memset(u_AllData, 0.0, 3 * sa_size * sizeof(double));
@@ -537,7 +535,6 @@ __host__ void setup_data(double * u_dx2, double * u_dx4, double * u_SimP, double
         memset(u_bvec, 0.0, Nbvec * 3 * sizeof(double));                   // bvec is read from file
         memset(u_bval, 0.0, Nbvec * sizeof(double));                       // bval is read from file
         memset(u_TD, 0.0,   Nbvec * sizeof(double));                       // TD is read from file
-
         memset(u_vf, 0.0, sizeof(double));                                 // Calc in vf kernel
         memset(u_label, 0.0,  n_vf * sizeof(int));                         // arg in or default
         printf("Set Host Values\n");

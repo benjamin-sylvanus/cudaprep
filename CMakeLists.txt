@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 project(your_project LANGUAGES CUDA CXX)
 
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS}")
 set(CMAKE_CUDA_ARCHITECTURES 75)
 set(CMAKE_CUDA_STANDARD 11)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
@@ -24,9 +25,8 @@ find_library(CUBLAS_LIBRARY cublas HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib64)
 find_library(CURAND_LIBRARY curand HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib64)
 find_library(CUSPARSE_LIBRARY cusparse HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib64)
 
-include_directories(${CMAKE_SOURCE_DIR})
+include_directories(${CMAKE_SOURCE_DIR} ${nlohmann_json_SOURCE_DIR}/include)
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
-
 
 set(SOURCES
    ${CMAKE_SOURCE_DIR}/src/datatemplate.cpp
@@ -36,6 +36,7 @@ set(SOURCES
    ${CMAKE_SOURCE_DIR}/src/viewer.cpp
    ${CMAKE_SOURCE_DIR}/src/funcs.cpp
    ${CMAKE_SOURCE_DIR}/src/overloads.cpp
+   ${CMAKE_SOURCE_DIR}/src/newsimreader.cpp
 )
 
 set(OBJECTS "")
@@ -45,7 +46,11 @@ foreach(SRC_FILE ${SOURCES})
     add_custom_command(
         OUTPUT ${OBJ_FILE}
         COMMAND ${CUDA_NVCC_EXECUTABLE}
-        ARGS -x cu -arch=sm_75 -I${CMAKE_SOURCE_DIR} -dc ${SRC_FILE} -o ${OBJ_FILE}
+        ARGS -x cu -arch=sm_75
+             -I${CMAKE_SOURCE_DIR} 
+             -I${nlohmann_json_SOURCE_DIR}/include 
+             -I${nlohmann_json_BINARY_DIR}/include
+             -dc ${SRC_FILE} -o ${OBJ_FILE}
         DEPENDS ${SRC_FILE}
     )
     list(APPEND OBJECTS ${OBJ_FILE})
@@ -54,8 +59,8 @@ endforeach()
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/bin/main.o
     COMMAND ${CUDA_NVCC_EXECUTABLE}
-    ARGS -arch=sm_75 -ccbin ${CMAKE_CXX_COMPILER} -dc -L${CUDA_TOOLKIT_ROOT_DIR}/lib64 ${CMAKE_SOURCE_DIR}/temp.cu -o ${CMAKE_CURRENT_BINARY_DIR}/bin/main.o
-    DEPENDS ${CMAKE_SOURCE_DIR}/temp.cu
+    ARGS -arch=sm_75 -ccbin ${CMAKE_CXX_COMPILER} -dc -L${CUDA_TOOLKIT_ROOT_DIR}/lib64 ${CMAKE_SOURCE_DIR}/main_new_reader.cu -o ${CMAKE_CURRENT_BINARY_DIR}/bin/main.o
+    DEPENDS ${CMAKE_SOURCE_DIR}/main_new_reader.cu
 )
 
 add_custom_command(
@@ -66,9 +71,7 @@ add_custom_command(
 )
 
 add_executable(app ${CMAKE_CURRENT_BINARY_DIR}/bin/main.o ${CMAKE_CURRENT_BINARY_DIR}/bin/gpuCode.o ${OBJECTS})
-
 set_directory_properties(PROPERTIES ADDITIONAL_CLEAN_FILES "${CMAKE_CURRENT_BINARY_DIR}/bin")
-
 set_target_properties(app PROPERTIES LINKER_LANGUAGE CUDA)
 target_link_libraries(app ${CUBLAS_LIBRARY} ${CURAND_LIBRARY} ${CUSPARSE_LIBRARY} ${CUDA_LIBRARIES} nlohmann_json::nlohmann_json)
 
