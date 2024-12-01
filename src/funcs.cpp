@@ -226,7 +226,7 @@ __device__ double3 setNextPos(double3 nextpos, double3 A, double4 xi, double ste
 __host__ void writeResults(double * w_swc, double * hostSimP, double * hostdx2, double * mdx2, double * hostdx4,
                                     double * mdx4, double * u_t, double * u_Reflections, double * u_uref, double * u_Sig0,
                                     double * u_SigRe, double * u_AllData,int iter, int size, int nrow,int timepoints, int Nbvec, int sa_size, int SaveAll,
-                                    std::string outpath)
+                                    std::string outpath, std::string binaryFilePath, std::string jsonFilePath)
 {
   // Check outdir exists
   // isdir()?  mkdir : ...
@@ -251,6 +251,18 @@ __host__ void writeResults(double * w_swc, double * hostSimP, double * hostdx2, 
     else
       std::cout << "Directory created\n";
 
+      // Write input paths to JSON file
+    std::string inputPathsJson = outpath + "/input_paths.json";
+    std::ofstream jsonFile(inputPathsJson);
+    if (jsonFile.is_open()) {
+        jsonFile << "{\n";
+        jsonFile << "  \"binaryFilePath\": \"" << binaryFilePath << "\",\n";
+        jsonFile << "  \"jsonFilePath\": \"" << jsonFilePath << "\"\n";
+        jsonFile << "}\n";
+        jsonFile.close();
+    } else {
+        std::cerr << "Error: Unable to create input paths JSON file" << std::endl;
+    }
 
     double t[iter];
     double tstep = hostSimP[8];
@@ -347,6 +359,155 @@ __host__ void writeResults(double * w_swc, double * hostSimP, double * hostdx2, 
         fwrite(u_AllData, sizeof(double),  3 * sa_size, outFile);
         fclose(outFile);
     }
+
+    
+}
+
+
+// TODO : check new header
+__host__ void writeResults_new(double * w_swc, double * hostSimP, double * hostdx2, double * mdx2, double * hostdx4,
+                         double * mdx4, double * u_t, double * u_Reflections, double * u_uref, double * u_Sig0,
+                         double * u_SigRe, double * u_AllData, int iter, int size, int nrow, int timepoints, 
+                         int Nbvec, int sa_size, int SaveAll, std::string outpath, 
+                         std::string binaryFilePath, std::string jsonFilePath)
+{
+    // Check/create output directory
+    struct stat sb;
+    if (stat(outpath.c_str(), &sb) != 0) {
+        if (mkdir(outpath.c_str(), 0777) == -1) {
+            std::cerr << "Error creating directory: " << std::strerror(errno) << std::endl;
+            return;
+        }
+    }
+
+    // Calculate time array
+    double* t = new double[iter];
+    double tstep = hostSimP[8];
+    for (int i = 0; i < iter; i++) {
+        t[i] = tstep * i;
+        // Calculate mdx2 and mdx4 as before
+        for (int j = 0; j < 6; j++) {
+            mdx2[6 * i + j] = (hostdx2[6 * i + j] / size) / (2.0 * t[i]);
+        }
+        for (int j = 0; j < 15; j++) {
+            mdx4[15 * i + j] = (hostdx4[15 * i + j] / size) / (2.0 * t[i]);
+        }
+    }
+
+    // Write all data to single binary file
+    std::string binPath = outpath + "/simulation_data.bin";
+    FILE* outFile = fopen(binPath.c_str(), "wb");
+    if (!outFile) {
+        std::cerr << "Error opening binary file" << std::endl;
+        delete[] t;
+        return;
+    }
+
+    // Write all data sequentially
+    fwrite(w_swc, sizeof(double), nrow * 4, outFile);           // order: 1
+    fwrite(hostSimP, sizeof(double), 10, outFile);              // order: 2
+    fwrite(hostdx2, sizeof(double), 6 * iter, outFile);         // order: 3
+    fwrite(mdx2, sizeof(double), 6 * iter, outFile);            // order: 4
+    fwrite(hostdx4, sizeof(double), 15 * iter, outFile);        // order: 5
+    fwrite(mdx4, sizeof(double), 15 * iter, outFile);           // order: 6
+    fwrite(t, sizeof(double), iter, outFile);                   // order: 7
+    fwrite(u_Reflections, sizeof(double), iter * size * 3, outFile); // order: 8
+    fwrite(u_uref, sizeof(double), iter * size * 3, outFile);   // order: 9
+    fwrite(u_Sig0, sizeof(double), timepoints, outFile);        // order: 10
+    fwrite(u_SigRe, sizeof(double), Nbvec * iter, outFile);     // order: 11
+    if (SaveAll) {
+        fwrite(u_AllData, sizeof(double), sa_size * 3, outFile); // order: 12
+    }
+    fclose(outFile);
+
+    // Create JSON metadata file
+    std::string jsonPath = outpath + "/output_metadata.json";
+    std::ofstream jsonFile(jsonPath);
+    if (jsonFile.is_open()) {
+        jsonFile << "{\n";
+        
+        // Write metadata for each dataset
+        jsonFile << "  \"swc_data\": {\n"
+                << "    \"dataType\": \"double\",\n"
+                << "    \"size\": [4, " << nrow << "],\n"
+                << "    \"order\": 1\n"
+                << "  },\n";
+        
+        jsonFile << "  \"simulation_params\": {\n"
+                << "    \"dataType\": \"double\",\n"
+                << "    \"size\": [10, 1],\n"
+                << "    \"order\": 2\n"
+                << "  },\n";
+        
+        jsonFile << "  \"dx2\": {\n"
+                << "    \"dataType\": \"double\",\n"
+                << "    \"size\": [" << iter << ", 6],\n"
+                << "    \"order\": 3\n"
+                << "  },\n";
+        
+        jsonFile << "  \"mdx2\": {\n"
+                << "    \"dataType\": \"double\",\n"
+                << "    \"size\": [" << iter << ", 6],\n"
+                << "    \"order\": 4\n"
+                << "  },\n";
+        
+        jsonFile << "  \"dx4\": {\n"
+                << "    \"dataType\": \"double\",\n"
+                << "    \"size\": [" << iter << ", 15],\n"
+                << "    \"order\": 5\n"
+                << "  },\n";
+        
+        jsonFile << "  \"mdx4\": {\n"
+                << "    \"dataType\": \"double\",\n"
+                << "    \"size\": [" << iter << ", 15],\n"
+                << "    \"order\": 6\n"
+                << "  },\n";
+        
+        jsonFile << "  \"time\": {\n"
+                << "    \"dataType\": \"double\",\n"
+                << "    \"size\": [" << iter << ", 1],\n"
+                << "    \"order\": 7\n"
+                << "  },\n";
+        
+        jsonFile << "  \"reflections\": {\n"
+                << "    \"dataType\": \"double\",\n"
+                << "    \"size\": [" << size << ", " << iter << ", 3],\n"
+                << "    \"order\": 8\n"
+                << "  },\n";
+        
+        jsonFile << "  \"uref\": {\n"
+                << "    \"dataType\": \"double\",\n"
+                << "    \"size\": [" << size << ", " << iter << ", 3],\n"
+                << "    \"order\": 9\n"
+                << "  },\n";
+        
+        jsonFile << "  \"sig0\": {\n"
+                << "    \"dataType\": \"double\",\n"
+                << "    \"size\": [" << timepoints << ", 1],\n"
+                << "    \"order\": 10\n"
+                << "  },\n";
+        
+        jsonFile << "  \"sigRe\": {\n"
+                << "    \"dataType\": \"double\",\n"
+                << "    \"size\": [" << Nbvec << ", " << iter << "],\n"
+                << "    \"order\": 11\n"
+                << "  }";
+
+        if (SaveAll) {
+            jsonFile << ",\n  \"all_data\": {\n"
+                    << "    \"dataType\": \"double\",\n"
+                    << "    \"size\": [" << size << ", " << iter << ", 3],\n"
+                    << "    \"order\": 12\n"
+                    << "  }";
+        }
+        
+        jsonFile << "\n}\n";
+        jsonFile.close();
+    } else {
+        std::cerr << "Error: Unable to create metadata JSON file" << std::endl;
+    }
+
+    delete[] t;
 }
 
 __device__ void computeNext(double3 &A, double &step, double4 &xi, double3 &nextpos, double &pi) {
@@ -478,8 +639,8 @@ __device__ void validCoord(double3 &nextpos, double3 &pos, int3 &b_int3, int3 &u
         // double3 intersection = intersectionPoint;
         nextpos = intersectionPoint + reflectionVector;
 
-        printf("NextPos: %f %f %f -> %f %f %f\n", nextpos.x, nextpos.y, nextpos.z, intersectionPoint.x+reflectionVector.x, intersectionPoint.y + reflectionVector.y, intersectionPoint.z + reflectionVector.z);
-        printf("Count: %d\n", count);
+        // printf("NextPos: %f %f %f -> %f %f %f\n", nextpos.x, nextpos.y, nextpos.z, intersectionPoint.x+reflectionVector.x, intersectionPoint.y + reflectionVector.y, intersectionPoint.z + reflectionVector.z);
+        // printf("Count: %d\n", count);
         count += 1;
 
         // store the intersection point and unreflected position
@@ -502,26 +663,24 @@ __host__ void setup_data(double * u_dx2, double * u_dx4, double * u_SimP, double
                                     double * u_bvec, double * u_bval, double * u_TD, std::vector<uint64_t> lut, std::vector<uint64_t> indexarr, 
                                     int3 bounds, int size, int iter, int nrow, int prod, int newindexsize, size_t sa_size, int Nbvec, int timepoints, int NC, int n_vf, double * u_vf, int * u_label) {
     // Set Values for Host
-    {
-        memset(u_dx2, 0.0, 6 * iter * sizeof(double));
-        memset(u_dx4, 0.0, 15 * iter * sizeof(double));
-        {
-            for (int i = 0; i < 10; i++) {
-                u_SimP[i] = simparam[i];
-            }            
-            for (int i = 0; i < nrow; i++) {
-                u_D4Swc[i].x = swc_trim[i].x;
-                u_D4Swc[i].y = swc_trim[i].y;
-                u_D4Swc[i].z = swc_trim[i].z;
-                u_D4Swc[i].w = swc_trim[i].w;
-            }
-            for (int i = 0; i < prod; i++) {
-                u_NewLut[i] = lut[i];
-            }
-            for (int i = 0; i < newindexsize; i++) {
-                u_NewIndex[i] = indexarr[i];
-            }
+    
+        
+        for (int i = 0; i < 10; i++) {
+            u_SimP[i] = simparam[i];
         }
+        for (int i = 0; i < nrow; i++) {
+            u_D4Swc[i].x = swc_trim[i].x;
+            u_D4Swc[i].y = swc_trim[i].y;
+            u_D4Swc[i].z = swc_trim[i].z;
+            u_D4Swc[i].w = swc_trim[i].w;
+        }
+        for (int i = 0; i < prod; i++) {
+            u_NewLut[i] = lut[i];
+        }
+        for (int i = 0; i < newindexsize; i++) {
+            u_NewIndex[i] = indexarr[i];
+        }
+        
         memset(mdx2, 0.0, 6 * iter * sizeof(double));
         memset(mdx4, 0.0, 15 * iter * sizeof(double));
         memset(u_AllData, 0.0, 3 * sa_size * sizeof(double));
@@ -538,7 +697,7 @@ __host__ void setup_data(double * u_dx2, double * u_dx4, double * u_SimP, double
         memset(u_vf, 0.0, sizeof(double));                                 // Calc in vf kernel
         memset(u_label, 0.0,  n_vf * sizeof(int));                         // arg in or default
         printf("Set Host Values\n");
-    }
+    
 }
 
 // Set Values for Host
