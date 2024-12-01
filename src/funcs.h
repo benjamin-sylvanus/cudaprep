@@ -103,7 +103,34 @@ __device__ double3
  writeResults(double * w_swc, double * hostSimP, double * hostdx2, double * mdx2, double * hostdx4,
                                     double * mdx4, double * t, double * u_Reflections, double * u_uref, double * u_Sig0,
                                     double * u_SigRe, double * u_AllData,int iter, int size, int nrow,int timepoints, int Nbvec, int sa_size, int SaveAll,
-                                    std::string outpath);
+                                    std::string outpath, std::string binaryFilePath, std::string jsonFilePath);
+
+ /**
+  * @brief Writes Results
+  * @param w_swc
+  * @param hostSimP
+  * @param hostdx2
+  * @param mdx2
+  * @param hostdx4
+  * @param mdx4
+  * @param t
+  * @param u_Reflections
+  * @param u_uref
+  * @param u_Sig0
+  * @param u_SigRe
+  * @param u_AllData
+  * @param iter
+  * @param size
+  * @param nrow
+  * @param sa_size
+  * @param outpath
+  * @return
+  */
+ __host__ void
+ writeResults_new(double * w_swc, double * hostSimP, double * hostdx2, double * mdx2, double * hostdx4,
+                                    double * mdx4, double * t, double * u_Reflections, double * u_uref, double * u_Sig0,
+                                    double * u_SigRe, double * u_AllData,int iter, int size, int nrow,int timepoints, int Nbvec, int sa_size, int SaveAll,
+                                    std::string outpath, std::string binaryFilePath, std::string jsonFilePath);
 
  /**
   * @brief Compute the next position of the particle

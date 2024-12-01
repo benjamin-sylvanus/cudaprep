@@ -84,7 +84,7 @@ __global__ void setup_kernel(curandStatePhilox4_32_10_t *state, unsigned long se
 __global__ void volfrac(curandStatePhilox4_32_10_t *state, int3 Bounds, double4 *d4swc, int *nlut, int *NewIndex, int3 IndexSize, int n, int *label, double *vf)
 {
     int gid = threadIdx.x + blockDim.x * blockIdx.x;
-    int N = 10000000;
+    int N = 10000;
     if (gid == 0)
     {
         printf("ok %d\n", n);
@@ -488,8 +488,8 @@ int main(int argc, char *argv[])
 
     // Convert swcmat to r_swc format
     std::vector<double> r_swc(nrow * 6);
-    for (size_t i = 0; i < nrow; i++) {
-        for (size_t j = 0; j < 6; j++) {
+    for (int i = 0; i < nrow; i++) {
+        for (int j = 0; j < 6; j++) {
             r_swc[i + nrow * j] = swcmat[i * 6 + j];
         }
     }
@@ -497,16 +497,16 @@ int main(int argc, char *argv[])
     double4 swc_trim[nrow];
     double w_swc[nrow * 4];
     for (int i = 0; i < nrow; i++) {
-        swc_trim[i].x = r_swc[i + nrow * 1];
-        swc_trim[i].y = r_swc[i + nrow * 2];
-        swc_trim[i].z = r_swc[i + nrow * 3];
-        swc_trim[i].w = r_swc[i + nrow * 4];
+        swc_trim[i].x = swcmat[i + nrow * 1];
+        swc_trim[i].y = swcmat[i + nrow * 2];
+        swc_trim[i].z = swcmat[i + nrow * 3];
+        swc_trim[i].w = swcmat[i + nrow * 4];
     }
     for (int i = 0; i < nrow; i++) {
-        w_swc[4 * i + 0] = r_swc[i + nrow * 1];
-        w_swc[4 * i + 1] = r_swc[i + nrow * 2];
-        w_swc[4 * i + 2] = r_swc[i + nrow * 3];
-        w_swc[4 * i + 3] = r_swc[i + nrow * 4];
+        w_swc[4 * i + 0] = swc_trim[i].x;
+        w_swc[4 * i + 1] = swc_trim[i].y;
+        w_swc[4 * i + 2] = swc_trim[i].z;
+        w_swc[4 * i + 3] = swc_trim[i].w;
     }
     int block_size = 256;
     dim3 block(block_size);
@@ -518,18 +518,18 @@ int main(int argc, char *argv[])
 
     /// Unified Memory
     // Declare Unified Memory Pointers
-
+    double4 *u_D4Swc;
     double *u_dx2, *u_dx4, *u_SimP, *u_T2, *u_T, *u_SigRe, *u_Sig0, *u_bvec,
         *u_bval, *u_TD, *mdx2, *mdx4, *u_AllData, *u_Reflections, *u_uref;
 
     int *u_NewLut, *u_NewIndex, *u_Flip;
-    double4 *u_D4Swc;
+
 
     // new
     int *u_label;
     double *u_vf;
     int n = 10000000;
-
+    cudaMallocManaged(&u_D4Swc, nrow * SOD4);
     cudaMallocManaged(&u_dx2, 6 * iter * SOD);
     cudaMallocManaged(&u_dx4, 15 * iter * SOD);
     cudaMallocManaged(&u_SimP, 10 * SOD);
@@ -548,7 +548,7 @@ int main(int argc, char *argv[])
     cudaMallocManaged(&u_NewLut, prod * SOI);
     cudaMallocManaged(&u_NewIndex, newindexsize * SOI);
     cudaMallocManaged(&u_Flip, 3 * size * SOI);
-    cudaMallocManaged(&u_D4Swc, nrow * SOD4);
+
     cudaMallocManaged(&u_label, n * SOI);
     cudaMallocManaged(&u_vf, SOD);
     //
@@ -558,7 +558,9 @@ int main(int argc, char *argv[])
     setup_data(u_dx2, u_dx4, u_SimP, u_D4Swc, u_NewLut, u_NewIndex, u_Flip, simparam, swc_trim, mdx2, mdx4,
                u_AllData, u_Reflections, u_uref, u_T2, u_T, u_SigRe, u_Sig0, u_bvec, u_bval, u_TD,
                lut, indexarr, bounds, size, iter, nrow, prod, newindexsize, sa_size, Nbvec, timepoints, NC, n, u_vf, u_label);
-
+    // option for printing in kernel
+    bool debug = false;
+    double3 point = make_double3(u_D4Swc[0].x, u_D4Swc[0].y, u_D4Swc[0].z);
     // Create Random State Pointer Pointers
     curandStatePhilox4_32_10_t *deviceState;
 
@@ -569,13 +571,13 @@ int main(int argc, char *argv[])
     // Set Values for Device
     setup_kernel<<<grid, block>>>(deviceState, 1); // initialize the random states
 
-    // option for printing in kernel
-    bool debug = false;
-    double3 point = make_double3(u_D4Swc[0].x, u_D4Swc[0].y, u_D4Swc[0].z);
+
+
     int3 u_Bounds = make_int3(bounds.x, bounds.y, bounds.z);
     int3 u_IndexSize = make_int3(index_dims[0], index_dims[1], index_dims[2]);
 
     // Prefetch data asynchronously
+    cudaMemPrefetchAsync(&u_D4Swc, nrow * SOD4, cudaCpuDeviceId);
     cudaMemPrefetchAsync(&u_dx2, 6 * iter * SOD, cudaCpuDeviceId);
     cudaMemPrefetchAsync(&u_dx4, 15 * iter * SOD, cudaCpuDeviceId);
     cudaMemPrefetchAsync(&u_SimP, 10 * SOD, cudaCpuDeviceId);
@@ -594,7 +596,6 @@ int main(int argc, char *argv[])
     cudaMemPrefetchAsync(&u_NewLut, prod * SOI, cudaCpuDeviceId);
     cudaMemPrefetchAsync(&u_NewIndex, newindexsize * SOI, cudaCpuDeviceId);
     cudaMemPrefetchAsync(&u_Flip, 3 * size * SOI, cudaCpuDeviceId);
-    cudaMemPrefetchAsync(&u_D4Swc, nrow * SOD4, cudaCpuDeviceId);
 
     // new
     cudaMemPrefetchAsync(&u_label, n * SOI, cudaCpuDeviceId);
@@ -639,10 +640,15 @@ int main(int argc, char *argv[])
     printf("Writing results: ");
 
     auto t1 = high_resolution_clock::now();
-    // Write Results
-    {
-        std::string outpath = root + "/results";
-        writeResults(w_swc, u_SimP, u_dx2, mdx2, u_dx4, mdx4, u_T, u_Reflections, u_uref, u_Sig0, u_SigRe, u_AllData, iter, size, nrow, timepoints, Nbvec, sa_size, SaveAll, outpath);
+    // // Write Results
+    // {
+    //     std::string outpath = root + "/results";
+    //     writeResults(w_swc, u_SimP, u_dx2, mdx2, u_dx4, mdx4, u_T, u_Reflections, u_uref, u_Sig0, u_SigRe, u_AllData, iter, size, nrow, timepoints, Nbvec, sa_size, SaveAll, outpath, binaryFile, jsonFile);
+    // }
+    // Write New Results
+    {   
+        std::string outpath = root + "/results_new";
+        writeResults_new(w_swc, u_SimP, u_dx2, mdx2, u_dx4, mdx4, u_T, u_Reflections, u_uref, u_Sig0, u_SigRe, u_AllData, iter, size, nrow, timepoints, Nbvec, sa_size, SaveAll, outpath, binaryFile, jsonFile);
     }
 
     auto t2 = high_resolution_clock::now();
